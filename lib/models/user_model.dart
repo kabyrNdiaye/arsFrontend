@@ -94,6 +94,9 @@ class User {
 
     // URL absolue → retourner telle quelle (le backend renvoie déjà la bonne URL)
     if (s.startsWith('http://') || s.startsWith('https://')) {
+      if (s.contains('onrender.com')) {
+        return s.replaceFirst('http://', 'https://');
+      }
       return s;
     }
 
