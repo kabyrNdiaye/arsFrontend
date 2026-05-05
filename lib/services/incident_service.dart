@@ -47,4 +47,14 @@ class IncidentService {
       throw Exception('Erreur lors de la récupération des incidents: $e');
     }
   }
+
+  /// PUT /api/incidents/{id} — Mettre à jour un incident
+  Future<Map<String, dynamic>> updateIncident(int id, Map<String, dynamic> data) async {
+    try {
+      final response = await _apiService.put('/incidents/$id', data);
+      return response['data'] ?? response;
+    } catch (e) {
+      throw Exception('Erreur lors de la mise à jour de l\'incident: $e');
+    }
+  }
 }

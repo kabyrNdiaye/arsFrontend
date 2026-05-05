@@ -8,6 +8,9 @@ import '../../services/mission_service.dart';
 import '../../providers/mission_provider.dart';
 import '../../models/mission_model.dart';
 import '../../providers/notification_provider.dart';
+import '../../services/incident_service.dart';
+import '../../services/feedback_service.dart';
+import '../../services/retour_service.dart';
 import 'package:provider/provider.dart';
 
 class AdminIncidentsScreen extends StatefulWidget {
@@ -21,6 +24,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final Color _adminPurple = const Color(0xFF7C39D3);
   final MissionService _missionService = MissionService();
+  final IncidentService _incidentService = IncidentService();
+  final FeedbackService _feedbackService = FeedbackService();
+  final RetourService _retourService = RetourService();
 
   late TabController _tabController;
   bool _isLoading = true;
@@ -117,12 +123,69 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
     List<Map<String, dynamic>> incidents = [];
     List<Map<String, dynamic>> feedbacks = [];
 
-    // Récupérer les messages en parallèle pour toutes les missions
     try {
-      final List<Future<void>> fetchTasks = missions.map((mission) async {
+      // 1. Récupérer les données des tables dédiées (Backend tables)
+      final List<Future<dynamic>> tableTasks = [
+        _incidentService.getIncidents(),
+        _feedbackService.getFeedbacks(),
+        _retourService.getRetours(),
+      ];
+
+      final results = await Future.wait(tableTasks);
+      
+      // Mapper les incidents de la table
+      final List<Map<String, dynamic>> tableIncidents = List<Map<String, dynamic>>.from(results[0]);
+      for (var inc in tableIncidents) {
+        incidents.add({
+          'id': inc['id'],
+          'content': inc['description'] ?? '',
+          'type': 'incident',
+          'is_handled': inc['statut'] == 'Traité' || inc['statut'] == 'Résolu',
+          'created_at': inc['created_at'],
+          'sender_name': inc['mission']?['professionnel']?['user']?['name'] ?? 'Professionnel',
+          '_mission_id': inc['mission_id'],
+          '_mission_name': inc['mission']?['structure']?['user']?['name'] ?? 'Mission',
+          '_is_table_record': true,
+          '_incident_type': inc['type'],
+        });
+      }
+
+      // Mapper les feedbacks de la table
+      final List<Map<String, dynamic>> tableFeedbacks = List<Map<String, dynamic>>.from(results[1]);
+      for (var f in tableFeedbacks) {
+        feedbacks.add({
+          'id': f['id'],
+          'content': '[Note: ${f['rating']}/5] ' + (f['comment'] ?? ''),
+          'type': 'feedback',
+          'is_handled': false, // Les feedbacks n'ont pas de statut handled par défaut
+          'created_at': f['created_at'],
+          'sender_name': f['user']?['name'] ?? 'Utilisateur',
+          '_is_table_record': true,
+        });
+      }
+
+      // Mapper les retours de mission de la table
+      final List<Map<String, dynamic>> tableRetours = List<Map<String, dynamic>>.from(results[2]);
+      for (var r in tableRetours) {
+        feedbacks.add({
+          'id': r['id'],
+          'content': '[Note: ${r['note']}/5] ' + (r['commentaire'] ?? ''),
+          'type': 'feedback',
+          'is_handled': false,
+          'created_at': r['created_at'],
+          'sender_name': r['mission']?['professionnel']?['user']?['name'] ?? 'Professionnel',
+          '_mission_id': r['mission_id'],
+          '_mission_name': r['mission']?['structure']?['user']?['name'] ?? 'Mission',
+          '_is_table_record': true,
+        });
+      }
+
+      // 2. Récupérer les messages de chat (Ancien système ou messages en temps réel)
+      final List<Future<void>> chatTasks = missions.map((mission) async {
         try {
           final messages = await _missionService.getChatMessages(mission.id);
           for (final msg in messages) {
+            // Éviter les doublons si possible (mais le type de record est différent)
             final enriched = {
               ...msg,
               '_mission_id': mission.id,
@@ -136,15 +199,13 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
             }
           }
         } catch (e) {
-          debugPrint(
-              'AdminIncidentsScreen: Error fetching messages for mission ${mission.id}: $e');
+          debugPrint('AdminIncidentsScreen: Chat fetch error for mission ${mission.id}: $e');
         }
       }).toList();
 
-      await Future.wait(fetchTasks);
+      await Future.wait(chatTasks);
     } catch (e) {
-      debugPrint(
-          'AdminIncidentsScreen: Critical error during parallel fetch: $e');
+      debugPrint('AdminIncidentsScreen: Critical error during fetch: $e');
     }
 
     // Sort by date (newest first)
@@ -483,7 +544,20 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
 
               setState(() => _markingHandled.add(messageId));
               try {
-                await _missionService.markMessageAsHandled(messageId);
+                if (msg['_is_table_record'] == true) {
+                  if (msg['type'] == 'incident') {
+                    // Mettre à jour la table incidents
+                    await _incidentService.updateIncident(messageId, {'statut': 'Traité'});
+                  } else {
+                    // Pour les feedbacks généraux/retours, on peut simplement marquer en UI 
+                    // ou ajouter une colonne handled en DB si nécessaire plus tard.
+                    // Pour l'instant, c'est un succès immédiat en UI.
+                  }
+                } else {
+                  // Ancien système : Marquer le message de chat comme traité
+                  await _missionService.markMessageAsHandled(messageId);
+                }
+
                 setState(() {
                   msg['is_handled'] = true;
                   _markingHandled.remove(messageId);
@@ -499,6 +573,7 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                   final missionProvider = Provider.of<MissionProvider>(context, listen: false);
                   missionProvider.markMissionAsReadLocal(missionId);
                 }
+                
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
