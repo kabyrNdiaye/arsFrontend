@@ -321,6 +321,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
   }
 
   Widget _buildDocumentsSection(LanguageProvider langProvider) {
+    final docs = _getDocuments(langProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth > 600; // tablette ou web
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
@@ -347,7 +351,26 @@ class _ProfilScreenState extends State<ProfilScreen> {
             ),
           ),
           SizedBox(height: 8.h),
-          ..._getDocuments(langProvider).map((doc) => _buildDocumentItem(doc['title']!, doc['url'], langProvider)).toList(),
+          if (isWide)
+            // Grille 2 colonnes pour tablette / web
+            GridView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12.w,
+                mainAxisSpacing: 8.h,
+                childAspectRatio: 4.5,
+              ),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final doc = docs[index];
+                return _buildDocumentItem(doc['title']!, doc['url'], langProvider);
+              },
+            )
+          else
+            // Liste linéaire pour mobile
+            ...docs.map((doc) => _buildDocumentItem(doc['title']!, doc['url'], langProvider)).toList(),
           SizedBox(height: 8.h),
           GestureDetector(
             onTap: () => _ajouterDocument(langProvider),
@@ -383,6 +406,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
       ),
     );
   }
+
 
   Widget _buildDocumentItem(String title, String? url, LanguageProvider langProvider) {
     return GestureDetector(
