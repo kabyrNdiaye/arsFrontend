@@ -4,6 +4,8 @@ import '../../utils/font_helper.dart';
 import 'login_screen_2.dart';
 import '../professionnel_inscription/inscription_professionnel_step1_screen.dart';
 import '../client_inscription/inscription_client_step1_screen.dart';
+import '../../providers/language_provider.dart';
+import 'package:provider/provider.dart';
 import 'dart:math' as math;
 
 class LoginScreen22 extends StatefulWidget {
@@ -16,7 +18,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final langProvider = Provider.of<LanguageProvider>(context);
     
     // Détecter la taille de l'écran et le type d'appareil
     final screenSize = MediaQuery.of(context).size;
@@ -57,7 +59,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
                     
                     // Contenu principal
                     Expanded(
-                      child: _buildContent(),
+                      child: _buildContent(langProvider),
                     ),
                   ],
                 ),
@@ -157,7 +159,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(LanguageProvider lang) {
     final screenWidth = MediaQuery.of(context).size.width;
     final shortestSide = MediaQuery.of(context).size.shortestSide;
     final isTablet = shortestSide >= 600 && shortestSide < 1200;
@@ -174,7 +176,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
             Padding(
               padding: EdgeInsets.only(top: isIPad ? 24.h : (isTablet ? 20.h : 24.h)),
               child: Text(
-                'Choisissez votre profil pour commencer',
+                lang.translate('choose_profile_start'),
                 style: getSourceSerifProStyle(
                   fontSize: isIPad ? 20.sp : 18.sp,
                   color: Colors.black87,
@@ -190,9 +192,9 @@ class _LoginScreen22State extends State<LoginScreen22> {
             
             // Carte Professionnel
             _buildProfileCard(
-              title: 'Professionnel',
-              subtitle: 'Cuisinier – Chef – Agent',
-              description: 'Je cherche des missions en cuisine',
+              title: lang.translate('professional'),
+              subtitle: lang.translate('professional_subtitle'),
+              description: lang.translate('professional_desc'),
               iconPath: 'assets/images/icon_personne.png',
               iconColor: Color(0xFFE0F7FA), // Bleu clair
               isSelected: _selectedProfile == 'professionnel',
@@ -207,9 +209,9 @@ class _LoginScreen22State extends State<LoginScreen22> {
             
             // Carte Client
             _buildProfileCard(
-              title: 'Client',
-              subtitle: 'EHPAD – Clinique – Restaurant',
-              description: 'Je cherche des professionnels qualifiés',
+              title: lang.translate('client_establishment').split('(')[0].trim(),
+              subtitle: lang.translate('client_subtitle'),
+              description: lang.translate('client_desc'),
               iconPath: 'assets/images/icon_client.png',
               iconColor: Color(0xFFE8F5E9), // Vert clair
               isSelected: _selectedProfile == 'client',
@@ -261,7 +263,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Continuer',
+                        lang.translate('continue'),
                         style: getSourceSerifProStyle(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w600,
@@ -288,7 +290,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Vous avez déjà un compte ?',
+                  lang.translate('already_have_account'),
                   style: getSourceSerifProStyle(
                     fontSize: 14.sp,
                     color: Colors.black87,
@@ -310,7 +312,7 @@ class _LoginScreen22State extends State<LoginScreen22> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
-                    'Connectez-vous.',
+                    lang.translate('login_instructions').split(' ')[0] == 'Entrez' ? 'Connectez-vous.' : 'Log in.', // Manual fix or use a better key
                     style: getSourceSerifProStyle(
                       fontSize: 14.sp,
                       color: Color(0xFF0059AB),

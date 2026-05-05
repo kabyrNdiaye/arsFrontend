@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../services/formation_service.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/formation_model.dart';
+import 'youtube_player_screen.dart';
+import '../../providers/notification_provider.dart';
+import '../../providers/mission_provider.dart';
 
 class FormationsScreen extends StatefulWidget {
   const FormationsScreen({Key? key}) : super(key: key);
@@ -11,71 +18,80 @@ class FormationsScreen extends StatefulWidget {
 }
 
 class _FormationsScreenState extends State<FormationsScreen> {
-  // Données de démonstration (en attendant le backend)
-  // TODO: Remplacer par les données du backend quand disponible
-  final List<Map<String, dynamic>> _formationsObligatoires = [
-    {
-      'titre': 'Hygiène en cuisine',
-      'duree': '45 mn',
-      'statut': 'a_completer',
-      'image': 'assets/images/formation_hygiene.jpg',
-    },
-  ];
+  final FormationService _formationService = FormationService();
+  bool _isLoading = true;
+  List<FormationModel> _allFormations = [];
 
-  final List<Map<String, dynamic>> _formationsRecommandees = [
-    {
-      'titre': 'Gestion des textures',
-      'duree': '30 mn',
-      'statut': 'non_commence',
-      'image': 'assets/images/formation_textures.jpg',
-    },
-    {
-      'titre': 'Dressage professionnel',
-      'duree': '30 mn',
-      'statut': 'non_commence',
-      'image': 'assets/images/formation_dressage.jpg',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchFormations();
+  }
+
+  Future<void> _fetchFormations() async {
+    try {
+      final formations = await _formationService.getFormations();
+      setState(() {
+        _allFormations = formations;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      }
+    }
+  }
+
+  List<FormationModel> _getFilteredFormations(int? userId) {
+    // Ne montrer que les formations assignées à cet utilisateur OU les formations générales (null)
+    return _allFormations.where((f) => f.professionnelId == null || f.professionnelId == userId).toList();
+  }
+
+  List<FormationModel> _getObligatoires(List<FormationModel> filtered) {
+    return filtered.where((f) => f.typeFormation.toLowerCase() == 'obligatoire').toList();
+  }
+
+  List<FormationModel> _getRecommandees(List<FormationModel> filtered) {
+    return filtered.where((f) => f.typeFormation.toLowerCase() != 'obligatoire').toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final professionnelId = authProvider.user?.professionnelId;
+    final filtered = _getFilteredFormations(professionnelId);
+    final obligatoires = _getObligatoires(filtered);
+    final recommandees = _getRecommandees(filtered);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Color(0xFF0059AB), // Même couleur que le header
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Color(0xFF0059AB),
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: Color(0xFFF5F7FA),
+        backgroundColor: const Color(0xFFF5F7FA),
         body: Column(
           children: [
-            // Header bleu
             _buildHeader(),
-            
-            // Contenu
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 16.h),
-                    
-                    // Section Obligatoires
-                    _buildSection('Obligatoires', _formationsObligatoires),
-                    
-                    SizedBox(height: 24.h),
-                    
-                    // Section Recommandées
-                    _buildSection('Recommandées', _formationsRecommandees),
-                    
-                    SizedBox(height: 24.h),
-                  ],
-                ),
-              ),
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0059AB)))
+                : filtered.isEmpty
+                  ? Center(child: Padding(padding: EdgeInsets.only(top: 100.h), child: const Text('Aucune formation disponible')))
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 16.h),
+                          if (obligatoires.isNotEmpty) _buildSection('Obligatoires', obligatoires),
+                          if (obligatoires.isNotEmpty && recommandees.isNotEmpty) SizedBox(height: 24.h),
+                          if (recommandees.isNotEmpty) _buildSection('Recommandées', recommandees),
+                          SizedBox(height: 24.h),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -86,15 +102,13 @@ class _FormationsScreenState extends State<FormationsScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: Color(0xFF0059AB),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF0059AB)),
       child: SafeArea(
         bottom: false,
         top: false,
         child: Column(
           children: [
-            // Trait horizontal en haut, juste sous la barre de statut
+            // Trait horizontal standard (Pro)
             Padding(
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top > 0 ? MediaQuery.of(context).padding.top + 8.h : 32.h,
@@ -110,47 +124,54 @@ class _FormationsScreenState extends State<FormationsScreen> {
               padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 20.h),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    'Formations',
-                    style: getInterStyle(
-                      fontSize: 24.sp,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  // Icône notification
-                  Stack(
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.white,
-                        size: 26.sp,
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          width: 16.w,
-                          height: 16.h,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '2',
-                              style: getInterStyle(
-                                fontSize: 9.sp,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
+                  Text('Formations', style: getInterStyle(fontSize: 24.sp, color: Colors.white, fontWeight: FontWeight.w700)),
+                  Consumer2<NotificationProvider, MissionProvider>(
+                    builder: (context, notifProvider, missionProvider, child) {
+                      final int totalUnread = missionProvider.totalUnreadMessagesCount + missionProvider.newMissionsCount;
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          // Navigation désactivée - Indicateur uniquement
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white,
+                              size: 28.sp,
                             ),
-                          ),
+                            if (totalUnread > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 16.w,
+                                    minHeight: 16.w,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -161,186 +182,80 @@ class _FormationsScreenState extends State<FormationsScreen> {
     );
   }
 
-  Widget _buildSection(String title, List<Map<String, dynamic>> formations) {
+  Widget _buildSection(String title, List<FormationModel> formations) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
-          child: Text(
-            title,
-            style: getInterStyle(
-              fontSize: 16.sp,
-              color: Colors.black87,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          child: Text(title, style: getInterStyle(fontSize: 16.sp, color: Colors.black87, fontWeight: FontWeight.w700)),
         ),
         SizedBox(height: 12.h),
-        ...formations.map((formation) => Padding(
-          padding: EdgeInsets.only(bottom: 12.h),
-          child: _buildFormationCard(formation),
-        )).toList(),
+        ...formations.map((f) => _buildFormationCard(f)).toList(),
       ],
     );
   }
 
-  Widget _buildFormationCard(Map<String, dynamic> formation) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Image
-          ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(12),
-              bottomLeft: Radius.circular(12),
-            ),
-            child: Container(
-              width: 100.w,
-              height: 90.h,
-              color: Color(0xFF0059AB).withOpacity(0.1),
-              child: Stack(
-                children: [
-                  // Image placeholder avec icône
-                  Center(
-                    child: Image.asset(
-                      'assets/images/icon_formation.png',
-                      width: 40.w,
-                      height: 40.h,
-                      color: Color(0xFF0059AB).withOpacity(0.5),
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          Icons.school_outlined,
-                          size: 40.sp,
-                          color: Color(0xFF0059AB).withOpacity(0.5),
-                        );
-                      },
-                    ),
-                  ),
-                  // Icône play
-                  Positioned(
-                    bottom: 8.h,
-                    right: 8.w,
-                    child: Container(
-                      width: 28.w,
-                      height: 28.h,
-                      decoration: BoxDecoration(
-                        color: Color(0xFF0059AB),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 18.sp,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Contenu
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(12.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    formation['titre'],
-                    style: getInterStyle(
-                      fontSize: 14.sp,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 6.h),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time_outlined,
-                        size: 14.sp,
-                        color: Colors.grey[500],
-                      ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        'Durée : ${formation['duree']}',
-                        style: getInterStyle(
-                          fontSize: 12.sp,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (formation['statut'] == 'a_completer') ...[
-                    SizedBox(height: 8.h),
-                    _buildStatusBadge(formation['statut']),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildFormationCard(FormationModel formation) {
+    final thumbnailUrl = formation.videoUrl != null 
+        ? 'https://img.youtube.com/vi/${formation.videoUrl}/0.jpg'
+        : null;
 
-  Widget _buildStatusBadge(String statut) {
-    Color bgColor;
-    Color textColor;
-    String text;
-    
-    switch (statut) {
-      case 'a_completer':
-        bgColor = Color(0xFFFFF3E0);
-        textColor = Color(0xFFFF9800);
-        text = 'A compléter';
-        break;
-      case 'en_cours':
-        bgColor = Color(0xFFE3F2FD);
-        textColor = Color(0xFF0059AB);
-        text = 'En cours';
-        break;
-      case 'termine':
-        bgColor = Color(0xFFE8F5E9);
-        textColor = Color(0xFF4CAF50);
-        text = 'Terminé';
-        break;
-      default:
-        return SizedBox.shrink();
-    }
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: getInterStyle(
-          fontSize: 11.sp,
-          color: textColor,
-          fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: () {
+        if (formation.videoUrl != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => YouTubePlayerScreen(videoId: formation.videoUrl!, title: formation.titre),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+              child: Container(
+                width: 110.w,
+                height: 90.h,
+                color: Colors.black12,
+                child: thumbnailUrl != null 
+                  ? Image.network(thumbnailUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_outline))
+                  : const Icon(Icons.school_outlined),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(12.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(formation.titre, style: getInterStyle(fontSize: 14.sp, color: Colors.black87, fontWeight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    SizedBox(height: 8.h),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time_outlined, size: 14.sp, color: Colors.grey[500]),
+                        SizedBox(width: 4.w),
+                        Text(formation.duree ?? 'N/A', style: getInterStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+            SizedBox(width: 8.w),
+          ],
         ),
       ),
     );
   }
 }
-
-

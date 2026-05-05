@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import 'inscription_professionnel_step5_screen.dart';
 
 class InscriptionProfessionnelStep4Screen extends StatefulWidget {
@@ -38,14 +40,14 @@ class InscriptionProfessionnelStep4Screen extends StatefulWidget {
 }
 
 class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfessionnelStep4Screen> {
-  String? _photoProfil;
-  List<String> _diplomes = [];
-  String? _certificatMedical;
-  String? _permisConduire;
+  PlatformFile? _photoProfil;
+  List<PlatformFile> _diplomes = [];
+  PlatformFile? _certificatMedical;
+  PlatformFile? _permisConduire;
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -64,7 +66,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(isIPad),
+          _buildHeader(isIPad, lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -104,7 +106,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: isIPad ? 24.h : 20.h),
                             Text(
-                              'Documents requis',
+                              lang.translate('required_documents'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -114,7 +116,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: 8.h),
                             Text(
-                              'Chargez vos documents professionnels',
+                              lang.translate('upload_prof_docs'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -141,7 +143,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Note : ',
+                                      lang.translate('note'),
                                       style: getSourceSerifProStyle(
                                         fontSize: 12.sp,
                                         fontWeight: FontWeight.bold,
@@ -150,7 +152,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                                     ),
                                     Expanded(
                                       child: Text(
-                                        'Vous pourrez ajouter ces documents plus tard depuis votre profil si vous ne les avez pas maintenant',
+                                        lang.translate('upload_later_details'),
                                         style: getSourceSerifProStyle(
                                           fontSize: 12.sp,
                                           color: Color(0xFF0059AB),
@@ -166,13 +168,14 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             
                             // Photo de profil
                             _buildDocumentUpload(
-                              title: 'Photo de profil',
-                              subtitle: 'Format JPG ou PNG',
+                              title: lang.translate('profile_photo'),
+                              subtitle: lang.translate('jpg_png_format'),
                               icon: Icons.camera_alt_outlined,
                               iconPath: 'assets/images/icon_photo.png',
-                              buttonText: 'Ajouter une photo',
-                              fileName: _photoProfil,
+                              buttonText: lang.translate('add_photo'),
+                              fileName: _photoProfil?.name,
                               isRequired: false,
+                              lang: lang,
                               onTap: () => _pickFile('photo'),
                               onRemove: () {
                                 setState(() {
@@ -185,14 +188,15 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             
                             // Diplômes de cuisine
                             _buildDocumentUpload(
-                              title: 'Diplômes de cuisine',
-                              subtitle: 'CAP, BEP, BAC, PRO, etc',
+                              title: lang.translate('cooking_diplomas'),
+                              subtitle: lang.translate('diplomas_formats'),
                               icon: Icons.upload_file_outlined,
                               iconPath: 'assets/images/icon_trelechargement.png',
-                              buttonText: 'Ajouter vos diplômes',
-                              fileNames: _diplomes,
+                              buttonText: lang.translate('add_diplomas'),
+                              fileNames: _diplomes.map((f) => f.name).toList(),
                               isRequired: false,
                               isMultiple: true,
+                              lang: lang,
                               onTap: () => _pickFile('diplomes'),
                               onRemoveMultiple: (index) {
                                 setState(() {
@@ -205,16 +209,17 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             
                             // Certificat médical (obligatoire)
                             _buildDocumentUpload(
-                              title: 'Certificat médical',
-                              subtitle: 'Obligatoire pour valider votre compte',
+                              title: lang.translate('medical_certificate'),
+                              subtitle: lang.translate('med_cert_desc'),
                               icon: Icons.medical_services_outlined,
                               iconPath: 'assets/images/icon_certificat.png',
-                              buttonText: 'Ajouter le certificat',
-                              fileName: _certificatMedical,
+                              buttonText: lang.translate('add_certificate'),
+                              fileName: _certificatMedical?.name,
                               isRequired: true,
                               customWidth: null,
                               customHeight: 70.h,
                               customIconSize: 24.w,
+                              lang: lang,
                               onTap: () => _pickFile('certificat'),
                               onRemove: () {
                                 setState(() {
@@ -227,16 +232,17 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             
                             // Permis de conduire
                             _buildDocumentUpload(
-                              title: 'Permis de conduire',
-                              subtitle: 'Recommandé pour plus de missions',
+                              title: lang.translate('driving_license'),
+                              subtitle: lang.translate('license_desc'),
                               icon: Icons.credit_card_outlined,
                               iconPath: 'assets/images/icon_permis.png',
-                              buttonText: 'Ajouter le permis',
-                              fileName: _permisConduire,
+                              buttonText: lang.translate('add_license'),
+                              fileName: _permisConduire?.name,
                               isRequired: false,
                               customWidth: null,
                               customHeight: 70.h,
                               customIconSize: 24.w,
+                              lang: lang,
                               onTap: () => _pickFile('permis'),
                               onRemove: () {
                                 setState(() {
@@ -275,6 +281,11 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                                   fonction: widget.fonction,
                                   anneesExperience: widget.anneesExperience,
                                   specialites: widget.specialites,
+                                  // Transmission des documents complets (PlatformFile)
+                                  photoProfilPath: _photoProfil,
+                                  diplomePath: _diplomes, // Transmission de la liste complète
+                                  certificatMedicalPath: _certificatMedical,
+                                  permisConduirePath: _permisConduire,
                                 ),
                               ),
                             );
@@ -292,7 +303,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -317,7 +328,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
     );
   }
 
-  Widget _buildHeader(bool isIPad) {
+  Widget _buildHeader(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -360,7 +371,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -372,7 +383,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                         ),
                         // Étape 4/5 à droite
                         Text(
-                          'Étape 4/5',
+                          '${lang.translate('step')} 4/5',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -441,6 +452,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
     required VoidCallback onTap,
     VoidCallback? onRemove,
     Function(int)? onRemoveMultiple,
+    required LanguageProvider lang,
   }) {
     final hasFile = fileName != null || (fileNames != null && fileNames.isNotEmpty);
     final iconSize = customIconSize ?? 48.w;
@@ -669,7 +681,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
                           ),
                           SizedBox(height: 12.h),
                           Text(
-                            '+ Ajouter un autre fichier',
+                            lang.translate('add_another_file'),
                             style: getSourceSerifProStyle(
                               fontSize: 12.sp,
                               color: Color(0xFF0059AB),
@@ -734,26 +746,25 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
         setState(() {
           switch (type) {
             case 'photo':
-              _photoProfil = result.files.first.name;
+              _photoProfil = result.files.first;
               break;
             case 'diplomes':
-              for (var file in result.files) {
-                _diplomes.add(file.name);
-              }
+              _diplomes.addAll(result.files);
               break;
             case 'certificat':
-              _certificatMedical = result.files.first.name;
+              _certificatMedical = result.files.first;
               break;
             case 'permis':
-              _permisConduire = result.files.first.name;
+              _permisConduire = result.files.first;
               break;
           }
         });
       }
     } catch (e) {
+      final lang = Provider.of<LanguageProvider>(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection du fichier: $e'),
+          content: Text('${lang.translate('file_pick_error')}$e'),
           backgroundColor: Colors.red,
         ),
       );

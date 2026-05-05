@@ -12,6 +12,15 @@ import 'admin_missions_screen.dart';
 import 'admin_equipe_screen.dart';
 import 'admin_parametres_screen.dart';
 import 'admin_profil_screen.dart';
+import 'admin_gestion_professionnels_screen.dart';
+import 'admin_gestion_structures_screen.dart';
+import 'admin_menus_screen.dart';
+import 'admin_recipes_screen.dart';
+import 'admin_formations_screen.dart';
+import 'admin_incidents_screen.dart';
+import 'admin_feedbacks_screen.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({Key? key}) : super(key: key);
@@ -23,6 +32,14 @@ class AdminSettingsScreen extends StatefulWidget {
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   int _currentIndex = 3; 
   final Color _primaryPurple = const Color(0xFF7C39D3);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MissionProvider>(context, listen: false).fetchAdminStats();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,21 +71,25 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           children: [
             _buildHeader(langProvider),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(16.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildStatisticsSection(langProvider),
-                    SizedBox(height: 24.h),
-                    _buildResourceManagementSection(langProvider),
-                    SizedBox(height: 24.h),
-                    _buildSettingsItem(langProvider),
-                    SizedBox(height: 16.h),
-                    _buildLogoutButton(langProvider),
-                    SizedBox(height: 20.h),
-                  ],
-                ),
+              child: Consumer<MissionProvider>(
+                builder: (context, missionProvider, child) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.all(16.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStatisticsSection(langProvider, missionProvider),
+                        SizedBox(height: 24.h),
+                        _buildResourceManagementSection(langProvider, missionProvider),
+                        SizedBox(height: 24.h),
+                        _buildSettingsItem(langProvider),
+                        SizedBox(height: 16.h),
+                        _buildLogoutButton(langProvider),
+                        SizedBox(height: 20.h),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
             _buildBottomNav(langProvider),
@@ -96,13 +117,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           bottomRight: Radius.circular(24),
         ),
       ),
-      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 24.h),
+      padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 20.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top > 0 ? MediaQuery.of(context).padding.top + 8.h : 32.h,
+              top: MediaQuery.of(context).padding.top + 20.h,
               left: 12.w,
               right: 12.w,
             ),
@@ -138,36 +159,52 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   ],
                 ),
               ),
-              Stack(
-                children: [
-                  Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white,
-                    size: 28.sp,
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 18.w,
-                      height: 18.w,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '2',
-                          style: getSourceSerifProStyle(
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+              Consumer2<NotificationProvider, MissionProvider>(
+                builder: (context, notifProvider, missionProvider, child) {
+                  final totalUnread = missionProvider.totalUnreadMessagesCount + missionProvider.newMissionsCount;
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      // Navigation désactivée - Indicateur uniquement
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          Icons.notifications_outlined,
+                          color: Colors.white,
+                          size: 26.sp,
                         ),
-                      ),
+                        if (totalUnread > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 16.w,
+                                minHeight: 16.w,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                  style: getSourceSerifProStyle(
+                                    fontSize: 8.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ],
           ),
@@ -176,7 +213,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     );
   }
 
-  Widget _buildStatisticsSection(LanguageProvider langProvider) {
+  Widget _buildStatisticsSection(LanguageProvider langProvider, MissionProvider missionProvider) {
+    final stats = missionProvider.adminStats;
+    final missions = stats['total_missions']?.toString() ?? '0';
+    final satisfaction = '${stats['satisfaction_percentage'] ?? 100}%';
+    final pros = stats['total_professionals']?.toString() ?? '0';
+    final incidents = stats['total_incidents']?.toString() ?? '0';
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -216,7 +259,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  '247',
+                  missions,
                   langProvider.translate('missions'),
                   const Color(0xFFF3E5F5),
                   _primaryPurple,
@@ -225,7 +268,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               SizedBox(width: 12.w),
               Expanded(
                 child: _buildStatCard(
-                  '98%',
+                  satisfaction,
                   langProvider.translate('satisfaction'),
                   const Color(0xFFE3F2FD),
                   const Color(0xFF2196F3),
@@ -238,7 +281,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  '32',
+                  pros,
                   langProvider.translate('pros_active'),
                   const Color(0xFFE8F5E9),
                   const Color(0xFF4CAF50),
@@ -247,7 +290,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               SizedBox(width: 12.w),
               Expanded(
                 child: _buildStatCard(
-                  '5',
+                  incidents,
                   langProvider.translate('incidents'),
                   const Color(0xFFFFF3E0),
                   const Color(0xFFFF9800),
@@ -291,7 +334,15 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     );
   }
 
-  Widget _buildResourceManagementSection(LanguageProvider langProvider) {
+  Widget _buildResourceManagementSection(LanguageProvider langProvider, MissionProvider missionProvider) {
+    final stats = missionProvider.adminStats;
+    final profCount = stats['total_professionals']?.toString() ?? '0';
+    final sitesCount = stats['total_structures']?.toString() ?? '0';
+    final menusCount = stats['total_menus']?.toString() ?? '0';
+    final recipesCount = stats['total_recipes']?.toString() ?? '0';
+    final formationsCount = stats['total_formations']?.toString() ?? '0';
+    final incidentsCount = stats['total_incidents']?.toString() ?? '0';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -304,15 +355,49 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           ),
         ),
         SizedBox(height: 12.h),
-        _buildResourceItem(langProvider.translate('prof_management'), '32'),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AdminGestionProfessionnelsScreen(),
+              ),
+            );
+          },
+          child: _buildResourceItem(langProvider.translate('prof_management'), profCount),
+        ),
         SizedBox(height: 8.h),
-        _buildResourceItem(langProvider.translate('sites_management'), '12'),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AdminGestionStructuresScreen(),
+              ),
+            );
+          },
+          child: _buildResourceItem(langProvider.translate('sites_management'), sitesCount),
+        ),
         SizedBox(height: 8.h),
-        _buildResourceItem(langProvider.translate('menus_management'), '48'),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminMenusScreen())),
+          child: _buildResourceItem(langProvider.translate('menus_management'), menusCount),
+        ),
         SizedBox(height: 8.h),
-        _buildResourceItem(langProvider.translate('recipes_management'), '156'),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRecipesScreen())),
+          child: _buildResourceItem(langProvider.translate('recipes_management'), recipesCount),
+        ),
         SizedBox(height: 8.h),
-        _buildResourceItem(langProvider.translate('trainings_management'), '24'),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminFormationsScreen())),
+          child: _buildResourceItem(langProvider.translate('trainings_management'), formationsCount),
+        ),
+        SizedBox(height: 8.h),
+        GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminIncidentsScreen())),
+          child: _buildResourceItem(langProvider.translate('incidents_management'), incidentsCount),
+        ),
       ],
     );
   }
@@ -485,9 +570,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home_outlined, Icons.home, langProvider.translate('home'), 0),
-              _buildNavItem(Icons.card_giftcard_rounded, Icons.card_giftcard, langProvider.translate('missions'), 1),
+              _buildNavItem(Icons.work_outline, Icons.work, langProvider.translate('missions'), 1),
               _buildNavItem(Icons.people_outline, Icons.people, langProvider.translate('team'), 2),
-              _buildNavItem(Icons.settings_rounded, Icons.settings, langProvider.translate('admin_panel'), 3),
+              _buildNavItem(Icons.settings_outlined, Icons.settings, langProvider.translate('admin_panel'), 3),
               _buildNavItem(Icons.person_outline, Icons.person, langProvider.translate('profile'), 4),
             ],
           ),

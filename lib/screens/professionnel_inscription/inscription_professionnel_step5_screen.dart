@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../providers/language_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
-import '../professionnel_screen/professionnel_home_screen.dart';
+import '../auth/login_screen_2.dart';
 
 class InscriptionProfessionnelStep5Screen extends StatefulWidget {
   final String prenom;
@@ -15,9 +17,15 @@ class InscriptionProfessionnelStep5Screen extends StatefulWidget {
   final String adresse;
   final String codePostal;
   final String ville;
-  final String fonction;
-  final String anneesExperience;
+  final String fonction; // Ajouté
+  // final String? numeroSecuriteSociale; // Supprimé
+  final String? diplome;
+  final String? anneesExperience; // Peut être null si parsé depuis String
   final List<String> specialites;
+  final dynamic photoProfilPath; // Modifié en dynamic
+  final dynamic diplomePath; // List<PlatformFile>? ou PlatformFile?
+  final dynamic certificatMedicalPath; // Modifié en dynamic
+  final dynamic permisConduirePath; // Modifié en dynamic
 
   const InscriptionProfessionnelStep5Screen({
     Key? key,
@@ -29,9 +37,15 @@ class InscriptionProfessionnelStep5Screen extends StatefulWidget {
     required this.adresse,
     required this.codePostal,
     required this.ville,
-    required this.fonction,
-    required this.anneesExperience,
+    required this.fonction, // Ajouté
+    // this.numeroSecuriteSociale, // Supprimé
+    this.diplome,
+    this.anneesExperience,
     required this.specialites,
+    this.photoProfilPath,
+    this.diplomePath,
+    this.certificatMedicalPath,
+    this.permisConduirePath,
   }) : super(key: key);
 
   @override
@@ -62,7 +76,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -81,7 +95,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(isIPad),
+          _buildHeader(isIPad, lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -115,7 +129,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                             
                             // Titre
                             Text(
-                              'Sécuriser votre compte',
+                              lang.translate('secure_account_title'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -128,7 +142,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                             
                             // Sous-titre
                             Text(
-                              'Créez un mot de passe fort',
+                              lang.translate('create_strong_pw'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -146,7 +160,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                 children: [
                                   // Label Mot de passe
                                   Text(
-                                    'Mot de passe *',
+                                    '${lang.translate('password')} *',
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -201,10 +215,10 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return 'Le mot de passe est obligatoire';
+                                        return lang.translate('pw_required_err');
                                       }
                                       if (!_isPasswordValid) {
-                                        return 'Le mot de passe ne respecte pas les critères';
+                                        return lang.translate('pw_criteria_err');
                                       }
                                       return null;
                                     },
@@ -213,17 +227,17 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                   SizedBox(height: 16.h),
                                   
                                   // Critères du mot de passe
-                                  _buildPasswordRequirement('Au moins 8 caractères', _hasMinLength),
+                                  _buildPasswordRequirement(lang.translate('at_least_8_chars'), _hasMinLength, lang),
                                   SizedBox(height: 6.h),
-                                  _buildPasswordRequirement('Une majuscule', _hasUppercase),
+                                  _buildPasswordRequirement(lang.translate('one_uppercase'), _hasUppercase, lang),
                                   SizedBox(height: 6.h),
-                                  _buildPasswordRequirement('Un chiffre', _hasDigit),
+                                  _buildPasswordRequirement(lang.translate('one_digit'), _hasDigit, lang),
                                   
                                   SizedBox(height: 24.h),
                                   
                                   // Label Confirmer mot de passe
                                   Text(
-                                    'Confirmer le mot de passe *',
+                                    '${lang.translate('confirm_password')} *',
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -277,10 +291,10 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return 'La confirmation est obligatoire';
+                                        return lang.translate('confirm_required_err');
                                       }
                                       if (value != _passwordController.text) {
-                                        return 'Les mots de passe ne correspondent pas';
+                                        return lang.translate('pw_mismatch_err');
                                       }
                                       return null;
                                     },
@@ -334,25 +348,25 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                                 height: 1.4,
                                               ),
                                               children: [
-                                                TextSpan(text: "J'accepte les "),
+                                                TextSpan(text: lang.translate('i_accept_prefix')),
                                                 TextSpan(
-                                                  text: "conditions d'utilisation",
+                                                  text: lang.translate('accept_terms'),
                                                   style: getSourceSerifProStyle(
                                                     fontSize: 13.sp,
                                                     color: Color(0xFF0059AB),
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
-                                                TextSpan(text: " et la "),
+                                                TextSpan(text: lang.translate('and_the_privacy')),
                                                 TextSpan(
-                                                  text: "politique de confidentialité",
+                                                  text: lang.translate('privacy_policy'),
                                                   style: getSourceSerifProStyle(
                                                     fontSize: 13.sp,
                                                     color: Color(0xFF0059AB),
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
-                                                TextSpan(text: " d'ARS"),
+                                                TextSpan(text: lang.translate('of_ars_suffix')),
                                               ],
                                             ),
                                           ),
@@ -413,7 +427,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                                     ),
                                     SizedBox(width: 8.w),
                                     Text(
-                                      'Créer mon compte',
+                                      lang.translate('create_account_btn'),
                                       style: getSourceSerifProStyle(
                                         fontSize: 16.sp,
                                         fontWeight: FontWeight.w600,
@@ -436,7 +450,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
     );
   }
 
-  Widget _buildHeader(bool isIPad) {
+  Widget _buildHeader(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -479,7 +493,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -491,7 +505,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
                         ),
                         // Étape 5/5 à droite
                         Text(
-                          'Étape 5/5',
+                          '${lang.translate('step')} 5/5',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -544,7 +558,7 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
     );
   }
 
-  Widget _buildPasswordRequirement(String text, bool isMet) {
+  Widget _buildPasswordRequirement(String text, bool isMet, LanguageProvider lang) {
     return Row(
       children: [
         Container(
@@ -568,51 +582,79 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
     );
   }
 
+  // Helper pour convertir la date française (JJ/MM/AAAA) en format API (AAAA-MM-JJ)
+  String _formatDateForApi(String dateFr) {
+    try {
+      if (dateFr.isEmpty) return '';
+      // Suppose format JJ/MM/AAAA
+      final parts = dateFr.split('/');
+      if (parts.length == 3) {
+        return '${parts[2]}-${parts[1]}-${parts[0]}';
+      }
+      return dateFr; // Retourne tel quel si format non reconnu
+    } catch (e) {
+      return dateFr;
+    }
+  }
+
+  // Helper pour convertir l'expérience texte en entier
+  String _convertExperienceToInt(String? experience) {
+    if (experience == null) return '0';
+    if (experience == 'under_2_years') return '1';
+    if (experience == '2_to_5_years') return '3';
+    if (experience == '5_to_10_years') return '7';
+    if (experience == 'over_10_years') return '11';
+    return '0';
+  }
+
   Future<void> _register() async {
-    setState(() {
-      _isLoading = true;
-    });
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
+      // Conversion des formats
+      final formattedDate = _formatDateForApi(widget.dateNaissance);
+      final numericExperience = _convertExperienceToInt(widget.anneesExperience);
+
+      // Construire l'adresse complète
+      final fullAddress = '${widget.adresse}, ${widget.codePostal} ${widget.ville}';
+
       final success = await authProvider.register(
         firstName: widget.prenom,
         lastName: widget.nom,
         email: widget.email,
         phone: widget.telephone,
         password: _passwordController.text,
-        address: '${widget.adresse}, ${widget.codePostal} ${widget.ville}',
+        address: fullAddress,
+        role: 'professionnel',
+        fonction: widget.fonction, // Ajouté
+        // Données spécifiques professionnel
+        dateNaissance: formattedDate,
+        codePostal: widget.codePostal,
+        ville: widget.ville,
+        diplome: widget.diplome,
+        anneesExperience: numericExperience,
+        specialites: widget.specialites, // Ajouté
+        photoProfilPath: widget.photoProfilPath,
+        diplomePaths: widget.diplomePath is List ? widget.diplomePath : (widget.diplomePath != null ? [widget.diplomePath] : null),
+        certificatMedicalPath: widget.certificatMedicalPath,
+        permisConduirePath: widget.permisConduirePath,
       );
 
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Compte créé avec succès !'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProfessionnelHomeScreen(
-              userName: '${widget.prenom} ${widget.nom}',
-            ),
-          ),
-          (route) => false,
-        );
+        // Déconnecter l'utilisateur pour forcer une connexion manuelle
+        await authProvider.logout();
+
+        // Afficher le dialogue de succès
+        _showSuccessDialog();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.errorMessage ?? 'Erreur lors de la création du compte'),
+            content: Text(authProvider.errorMessage ?? lang.translate('registration_error')),
             backgroundColor: Colors.red,
           ),
         );
@@ -621,17 +663,54 @@ class _InscriptionProfessionnelStep5ScreenState extends State<InscriptionProfess
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('${lang.translate('error')}: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showSuccessDialog() {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 30),
+              SizedBox(width: 10),
+              Text(lang.translate('registration_success')),
+            ],
+          ),
+          content: Text(
+            lang.translate('reg_success_pro_desc'),
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              child: Text(
+                lang.translate('login_btn'),
+                style: TextStyle(color: Color(0xFF0059AB), fontWeight: FontWeight.bold),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(); // Fermer le dialogue
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => LoginScreen2()),
+                  (route) => false,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

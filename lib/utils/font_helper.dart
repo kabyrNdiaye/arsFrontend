@@ -10,6 +10,7 @@ TextStyle getSourceSerifProStyle({
   double? height,
   Color? color,
   FontStyle? fontStyle,
+  TextDecoration? decoration,
 }) {
   // Essayer d'abord avec la police locale (si les fichiers sont dans assets/fonts/)
   // Note: Flutter détectera automatiquement si la police est disponible
@@ -24,6 +25,7 @@ TextStyle getSourceSerifProStyle({
     height: height,
     color: color,
     fontStyle: fontStyle,
+    decoration: decoration,
   );
 }
 

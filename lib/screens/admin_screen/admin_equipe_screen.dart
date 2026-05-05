@@ -8,6 +8,10 @@ import 'admin_home_screen.dart';
 import 'admin_missions_screen.dart';
 import 'admin_settings_screen.dart';
 import 'admin_profil_screen.dart';
+import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class AdminEquipeScreen extends StatefulWidget {
   const AdminEquipeScreen({Key? key}) : super(key: key);
@@ -16,63 +20,45 @@ class AdminEquipeScreen extends StatefulWidget {
   _AdminEquipeScreenState createState() => _AdminEquipeScreenState();
 }
 
-class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
+class _AdminEquipeScreenState extends State<AdminEquipeScreen> with WidgetsBindingObserver {
   int _currentIndex = 2; // Équipe est l'onglet actif
   final TextEditingController _searchController = TextEditingController();
   final Color _primaryPurple = Color(0xFF7C39D3);
   final Color _lightPurple = Color(0xFF9058D4);
   String _searchQuery = '';
-
-  // Liste des professionnels
-  List<Map<String, dynamic>> _allProfessionals = [
-    {
-      'name': 'Jean Dupont',
-      'role': 'Cuisinier',
-      'status': 'En mission',
-      'mission': 'EHPAD Les Jardins',
-    },
-    {
-      'name': 'Marie Leroy',
-      'role': 'Chef de cuisine',
-      'status': 'En mission',
-      'mission': 'Restaurant Le Gourmet',
-    },
-    {
-      'name': 'Marie Leroy',
-      'role': 'Chef de cuisine',
-      'status': 'En mission',
-      'mission': 'Restaurant Le Gourmet',
-    },
-    {
-      'name': 'Pierre Bernard',
-      'role': 'Chef de cuisine',
-      'status': 'Disponible',
-    },
-    {
-      'name': 'Sophie Moreau',
-      'role': 'Pâtissière',
-      'status': 'Disponible',
-    },
-    {
-      'name': 'Jean Pierre',
-      'role': 'Cuisinier',
-      'status': 'Disponible',
-    },
-    {
-      'name': 'Marie Moreau',
-      'role': 'Cuisinier',
-      'status': 'Disponible',
-    },
-  ];
+  final AuthService _authService = AuthService();
+  List<User> _professionals = [];
+  bool _isLoading = true;
+  AppLifecycleState? _lastLifecycleState;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(_onSearchChanged);
+    _loadProfessionals();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _lastLifecycleState != AppLifecycleState.resumed) {
+      _loadProfessionals();
+    }
+    _lastLifecycleState = state;
+  }
+
+  Future<void> _loadProfessionals() async {
+    setState(() => _isLoading = true);
+    final professionals = await _authService.getProfessionals();
+    setState(() {
+      _professionals = professionals;
+      _isLoading = false;
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -85,31 +71,39 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
   }
 
   // Filtrer les professionnels selon la recherche
-  List<Map<String, dynamic>> get _filteredProfessionals {
+  List<User> get _filteredProfessionals {
     if (_searchQuery.isEmpty) {
-      return _allProfessionals;
+      return _professionals;
     }
     final query = _searchQuery.toLowerCase();
-    return _allProfessionals.where((professional) {
-      return professional['name'].toString().toLowerCase().contains(query) ||
-             professional['role'].toString().toLowerCase().contains(query);
+    return _professionals.where((professional) {
+      return professional.fullName.toLowerCase().contains(query) ||
+          professional.displayFunction.toLowerCase().contains(query);
     }).toList();
+  }
+
+  bool _isMissionConfirmed(Map<String, dynamic>? mission) {
+    if (mission == null) return false;
+    final status = mission['user_status']?.toString().toLowerCase() ??
+        mission['status']?.toString().toLowerCase() ??
+        mission['statut']?.toString().toLowerCase();
+    return status == 'confirmé' || status == 'confirmed' || status == 'en cours';
   }
 
   // Compter les professionnels disponibles
   int get _availableCount {
-    return _allProfessionals.where((p) => p['status'] == 'Disponible' || p['status'] == 'Available' || p['status'] == 'Disponibles').length;
+    return _professionals.where((p) => !_isMissionConfirmed(p.currentMission)).length;
   }
 
   // Compter les professionnels en mission
   int get _onMissionCount {
-    return _allProfessionals.where((p) => p['status'] == 'En mission' || p['status'] == 'On mission' || p['status'] == 'En misión').length;
+    return _professionals.where((p) => _isMissionConfirmed(p.currentMission)).length;
   }
 
   @override
   Widget build(BuildContext context) {
     final langProvider = Provider.of<LanguageProvider>(context);
-    
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: _primaryPurple,
@@ -128,64 +122,65 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard('$_availableCount', langProvider.translate('available'), _primaryPurple),
+                    child: _buildStatCard('$_availableCount',
+                        langProvider.translate('available'), _primaryPurple),
                   ),
                   SizedBox(width: 16.w),
                   Expanded(
-                    child: _buildStatCard('$_onMissionCount', langProvider.translate('in_progress'), Color(0xFF4CAF50)),
+                    child: _buildStatCard(
+                        '$_onMissionCount',
+                        langProvider.translate('in_progress'),
+                        Color(0xFF4CAF50)),
                   ),
                 ],
               ),
             ),
             // Liste des professionnels
             Expanded(
-              child: _filteredProfessionals.isEmpty
+              child: _isLoading
                   ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32.w),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 64.sp,
-                              color: Colors.grey[400],
+                      child: CircularProgressIndicator(color: _primaryPurple))
+                  : _filteredProfessionals.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.w),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 64.sp,
+                                  color: Colors.grey[400],
+                                ),
+                                SizedBox(height: 16.h),
+                                Text(
+                                  langProvider
+                                      .translate('no_professional_found'),
+                                  style: getSourceSerifProStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: 16.h),
-                            Text(
-                              langProvider.translate('no_professional_found'),
-                              style: getSourceSerifProStyle(
-                                fontSize: 16.sp,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+                          itemCount: _filteredProfessionals.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: 12.h),
+                              child: _buildProfessionalCard(
+                                  _filteredProfessionals[index], langProvider),
+                            );
+                          },
                         ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-                      itemCount: _filteredProfessionals.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: 12.h),
-                          child: _buildProfessionalCard(_filteredProfessionals[index], langProvider),
-                        );
-                      },
-                    ),
             ),
           ],
         ),
         bottomNavigationBar: _buildBottomNav(langProvider),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            // TODO: Ajouter un professionnel
-          },
-          backgroundColor: _primaryPurple,
-          child: Icon(Icons.add, color: Colors.white, size: 28.sp),
-          elevation: 4,
-        ),
       ),
     );
   }
@@ -193,100 +188,124 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
   Widget _buildHeader(LanguageProvider langProvider) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            _primaryPurple,
-            _primaryPurple,
-          ],
+        color: _primaryPurple,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titre et notifications
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    langProvider.translate('team_management'),
+      padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 20.h),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 20.h,
+              left: 12.w,
+              right: 12.w,
+            ),
+            child: Container(
+              height: 1,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Titre et notifications
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      langProvider.translate('team_management'),
+                      style: getSourceSerifProStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Consumer2<NotificationProvider, MissionProvider>(
+                      builder: (context, notifProvider, missionProvider, child) {
+                        final totalUnread = missionProvider.totalUnreadMessagesCount + missionProvider.newMissionsCount;
+                        
+                        return GestureDetector(
+                          onTap: () {
+                            // Navigation désactivée - Indicateur uniquement
+                          },
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                Icons.notifications_outlined,
+                                color: Colors.white,
+                                size: 26.sp,
+                              ),
+                              if (totalUnread > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    padding: EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFF5252),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: BoxConstraints(
+                                      minWidth: 16.w,
+                                      minHeight: 16.w,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                        style: getSourceSerifProStyle(
+                                          fontSize: 8.sp,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+                // Barre de recherche
+                Container(
+                  decoration: BoxDecoration(
+                    color: _lightPurple.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText:
+                          langProvider.translate('search_professional_hint'),
+                      hintStyle: getSourceSerifProStyle(
+                        fontSize: 14.sp,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                      prefixIcon: Icon(Icons.search,
+                          color: Colors.white.withOpacity(0.9), size: 22.sp),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16.w, vertical: 14.h),
+                    ),
                     style: getSourceSerifProStyle(
-                      fontSize: 20.sp,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14.sp,
                       color: Colors.white,
                     ),
                   ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.white,
-                        size: 26.sp,
-                      ),
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: EdgeInsets.all(4.w),
-                          decoration: BoxDecoration(
-                            color: Color(0xFFFF5252),
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: BoxConstraints(
-                            minWidth: 18.w,
-                            minHeight: 18.w,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '2',
-                              style: getSourceSerifProStyle(
-                                fontSize: 10.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              // Barre de recherche
-              Container(
-                decoration: BoxDecoration(
-                  color: _lightPurple.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: langProvider.translate('search_professional_hint'),
-                    hintStyle: getSourceSerifProStyle(
-                      fontSize: 14.sp,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                    prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.9), size: 22.sp),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-                  ),
-                  style: getSourceSerifProStyle(
-                    fontSize: 14.sp,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -330,13 +349,18 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
     );
   }
 
-  Widget _buildProfessionalCard(Map<String, dynamic> professional, LanguageProvider langProvider) {
-    final isOnMission = professional['status'] == 'En mission';
+  Widget _buildProfessionalCard(
+      User professional, LanguageProvider langProvider) {
+    final currentMission = professional.currentMission;
+    final isOnMission = _isMissionConfirmed(currentMission);
+    final status = isOnMission
+        ? (langProvider.currentLanguage == 'fr'
+            ? 'En mission'
+            : langProvider.translate('in_progress'))
+        : langProvider.translate('available');
 
     return InkWell(
-      onTap: () {
-        // TODO: Naviguer vers les détails du professionnel
-      },
+      onTap: () {},
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: EdgeInsets.all(16.w),
@@ -354,10 +378,8 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section principale avec avatar, nom, rôle, statut
             Row(
               children: [
-                // Avatar circulaire avec fond violet clair
                 Container(
                   width: 48.w,
                   height: 48.w,
@@ -365,21 +387,31 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
                     color: Color(0xFFEDE7F6),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.person_outline,
-                    color: _primaryPurple,
-                    size: 26.sp,
-                  ),
+                  child: professional.profileImage != null
+                      ? ClipOval(
+                          child: Image.network(
+                            professional.profileImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.person_outline,
+                              color: _primaryPurple,
+                              size: 26.sp,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          Icons.person_outline,
+                          color: _primaryPurple,
+                          size: 26.sp,
+                        ),
                 ),
                 SizedBox(width: 12.w),
-                // Informations
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nom en gras
                       Text(
-                        professional['name'] ?? '',
+                        professional.fullName,
                         style: getSourceSerifProStyle(
                           fontSize: 15.sp,
                           fontWeight: FontWeight.w600,
@@ -387,9 +419,8 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
                         ),
                       ),
                       SizedBox(height: 4.h),
-                      // Rôle en gris
                       Text(
-                        professional['role'] ?? '',
+                        professional.displayFunction,
                         style: getSourceSerifProStyle(
                           fontSize: 13.sp,
                           color: Colors.grey[600],
@@ -397,53 +428,62 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
                         ),
                       ),
                       SizedBox(height: 6.h),
-                      // Badge de statut
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 10.w, vertical: 4.h),
                         decoration: BoxDecoration(
-                          color: isOnMission ? Color(0xFFE8F5E9) : Color(0xFFE3F2FD),
+                          color: isOnMission
+                              ? Color(0xFFE8F5E9)
+                              : Color(0xFFE3F2FD),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          professional['status'] ?? '',
+                          status,
                           style: getSourceSerifProStyle(
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w600,
-                            color: isOnMission ? Color(0xFF4CAF50) : Color(0xFF2196F3),
+                            color: isOnMission
+                                ? Color(0xFF4CAF50)
+                                : Color(0xFF2196F3),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Flèche à droite
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey[400],
-                  size: 24.sp,
-                ),
               ],
             ),
-            // Section mission (si en mission)
-            if (isOnMission && professional['mission'] != null) ...[
-              SizedBox(height: 12.h),
-              RichText(
-                text: TextSpan(
+            if (isOnMission && currentMission != null) ...[
+              SizedBox(height: 16.h),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: Color(0xFFF5F7FA),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
                   children: [
-                    TextSpan(
-                      text: '${langProvider.translate('mission')} : ',
+                    Text(
+                      '${langProvider.translate('mission')} : ',
                       style: getSourceSerifProStyle(
                         fontSize: 13.sp,
                         color: Colors.grey[500],
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    TextSpan(
-                      text: professional['mission'] ?? '',
-                      style: getSourceSerifProStyle(
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                    Expanded(
+                      child: Text(
+                        currentMission['nom_etablissement'] ??
+                            currentMission['structure_name'] ??
+                            currentMission['structureName'] ??
+                            '',
+                        style: getSourceSerifProStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -486,20 +526,29 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index, LanguageProvider langProvider) {
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label,
+      int index, LanguageProvider langProvider) {
     final isSelected = _currentIndex == index;
     final color = isSelected ? _primaryPurple : Colors.grey[400];
-    
+
     return InkWell(
       onTap: () {
         if (index == 0) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminHomeScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const AdminHomeScreen()));
         } else if (index == 1) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminMissionsScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => AdminMissionsScreen()));
         } else if (index == 3) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminSettingsScreen()));
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AdminSettingsScreen()));
         } else if (index == 4) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AdminProfilScreen()));
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AdminProfilScreen()));
         } else {
           setState(() {
             _currentIndex = index;
@@ -513,8 +562,8 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isSelected ? activeIcon : icon, 
-              color: color, 
+              isSelected ? activeIcon : icon,
+              color: color,
               size: 24.sp,
             ),
             SizedBox(height: 4.h),
@@ -532,4 +581,3 @@ class _AdminEquipeScreenState extends State<AdminEquipeScreen> {
     );
   }
 }
-

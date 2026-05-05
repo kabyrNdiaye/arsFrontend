@@ -209,7 +209,7 @@ class _ClientProfilScreenState extends State<ClientProfilScreen> {
                   
                   // Rôle et établissement
                   Text(
-                    widget.userRole ?? langProvider.translate('director'),
+                    widget.userRole ?? langProvider.translate('directeur'),
                     style: getInterStyle(
                       fontSize: 14.sp,
                       color: Colors.white.withOpacity(0.8),

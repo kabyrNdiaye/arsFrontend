@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -15,6 +16,8 @@ class ApiService {
     _token = token;
   }
 
+  String? get token => _token;
+
   // Supprimer le token
   void clearToken() {
     _token = null;
@@ -30,8 +33,24 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw Exception('Erreur de connexion: $e');
+      rethrow;
     }
+  }
+
+  Future<Map<String, dynamic>> getWithRetry(
+    String endpoint, {int maxRetries = 3}) async {
+    int attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        return await get(endpoint)
+            .timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        attempt++;
+        if (attempt == maxRetries) rethrow;
+        await Future.delayed(Duration(seconds: 1 << attempt));
+      }
+    }
+    throw Exception('Impossible de joindre le serveur.');
   }
 
   // Méthode générique pour les requêtes POST
@@ -48,7 +67,7 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw Exception('Erreur de connexion: $e');
+      rethrow;
     }
   }
 
@@ -66,7 +85,7 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw Exception('Erreur de connexion: $e');
+      rethrow;
     }
   }
 
@@ -80,17 +99,19 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw Exception('Erreur de connexion: $e');
+      rethrow;
     }
   }
 
   // Méthode pour upload de fichiers
   Future<Map<String, dynamic>> uploadFile(
     String endpoint,
-    String filePath,
-    String fieldName,
+    String? filePath,
+    String fieldName, {
     Map<String, String>? additionalFields,
-  ) async {
+    List<int>? fileBytes,
+    String? fileName,
+  }) async {
     try {
       var request = http.MultipartRequest(
         'POST',
@@ -101,8 +122,16 @@ class ApiService {
       request.headers.addAll(ApiConfig.getHeaders(token: _token));
       request.headers.remove('Content-Type'); // MultipartRequest le gère automatiquement
 
-      // Ajouter le fichier
-      request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+      // Ajouter le fichier (Path ou Bytes)
+      if (fileBytes != null && fileName != null) {
+        request.files.add(http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: fileName,
+        ));
+      } else if (filePath != null) {
+        request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+      }
 
       // Ajouter les autres champs
       if (additionalFields != null) {
@@ -114,25 +143,31 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw Exception('Erreur lors de l\'upload: $e');
+      rethrow;
     }
   }
 
   // Gestion de la réponse
   Map<String, dynamic> _handleResponse(http.Response response) {
     final statusCode = response.statusCode;
-    final responseBody = jsonDecode(response.body);
+    Map<String, dynamic> responseBody = {};
+    
+    try {
+      responseBody = jsonDecode(response.body);
+    } catch (_) {
+      // Si le corps n'est pas du JSON
+    }
 
     if (statusCode >= 200 && statusCode < 300) {
       return responseBody;
     } else if (statusCode == 401) {
-      // Token expiré ou invalide
+      // Token expiré ou identifiants invalides
       clearToken();
-      throw Exception('Session expirée. Veuillez vous reconnecter.');
+      final message = responseBody['message'] ?? 'Session expirée ou identifiants invalides.';
+      throw message;
     } else {
-      throw Exception(
-        responseBody['message'] ?? 'Erreur serveur: $statusCode',
-      );
+      final message = responseBody['message'] ?? 'Erreur serveur: $statusCode';
+      throw message;
     }
   }
 }

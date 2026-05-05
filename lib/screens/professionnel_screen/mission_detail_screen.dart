@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../utils/font_helper.dart';
+import '../../models/mission_model.dart';
+import '../../providers/language_provider.dart';
+import '../../services/mission_service.dart';
+import '../../models/recipe_model.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class MissionDetailScreen extends StatefulWidget {
-  final String etablissement;
-  final String adresse;
-  final String horaires;
+  final MissionModel mission;
 
   const MissionDetailScreen({
     Key? key,
-    this.etablissement = 'EHPAD Les Jardins',
-    this.adresse = '12 Rue de la Santé, Paris 75014',
-    this.horaires = '7h30 - 16h00',
+    required this.mission,
   }) : super(key: key);
 
   @override
@@ -21,16 +24,43 @@ class MissionDetailScreen extends StatefulWidget {
 }
 
 class _MissionDetailScreenState extends State<MissionDetailScreen> {
+  final MissionService _missionService = MissionService();
+  bool _isAccepting = false;
+  final Set<String> _expandedRecipes = {};
+  bool _isFinishing = false;
+
   // Checklist état
   Map<String, bool> checklist = {
-    'Ouverture': true,
-    'Frigos': true,
+    'Ouverture': false,
+    'Frigos': false,
     'Préparation': false,
     'Textures': false,
     'Dressage': false,
     'Nettoyage': false,
     'Signature': false,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.mission.checklistJournee != null && widget.mission.checklistJournee!.isNotEmpty) {
+      checklist.addAll(widget.mission.checklistJournee!);
+    }
+    
+    // Marquer les notifications liées à cette mission comme lues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationProvider>(context, listen: false).markAsReadByMissionId(widget.mission.id);
+    });
+  }
+
+  String _monthName(int month) {
+    const names = [
+      '',
+      'Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    return (month >= 1 && month <= 12) ? names[month] : '';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +79,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         body: Column(
           children: [
             // Header bleu
-            _buildHeader(),
+            _buildHeader(Provider.of<LanguageProvider>(context)),
             
             // Contenu scrollable
             Expanded(
@@ -58,13 +88,15 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                   children: [
                   SizedBox(height: 16.h),
                   
+                  // La section Informations générales de la mission a été retirée à la demande de l'utilisateur
+                  
                   // Section Accès & Logistique
                   _buildAccesLogistique(),
                   
                   SizedBox(height: 16.h),
                   
                   // Section Menu du jour
-                  _buildMenuDuJour(),
+                  _buildMenuDuJour(Provider.of<LanguageProvider>(context)),
                   
                   SizedBox(height: 16.h),
                   
@@ -76,10 +108,14 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                   // Section Checklist journée
                   _buildChecklistJournee(),
                   
+                  // Section Notes Administrateur
+                  if (widget.mission.adminComments != null && widget.mission.adminComments!.isNotEmpty)
+                    _buildAdminNotes(),
+                  
                   SizedBox(height: 24.h),
                   
                   // Boutons d'action
-                  _buildActionButtons(),
+                  _buildActionButtons(Provider.of<LanguageProvider>(context)),
                   
                   SizedBox(height: 32.h),
                 ],
@@ -92,7 +128,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider langProvider) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -129,7 +165,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                         Icon(Icons.arrow_back, color: Colors.white, size: 20.sp),
                         SizedBox(width: 4.w),
                         Text(
-                          'Retour',
+                          langProvider.translate('back'),
                           style: getInterStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -144,27 +180,30 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                   
                   // Nom établissement
                   Text(
-                    widget.etablissement,
+                    widget.mission.structureName ?? langProvider.translate('not_defined'),
                     style: getInterStyle(
                       fontSize: 20.sp,
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 4.h),
+                  // Les informations de date et du professionnel ont été retirées à la demande de l'utilisateur
                   
                   // Adresse
                   Row(
                     children: [
                       Icon(Icons.location_on_outlined, color: Colors.white70, size: 16.sp),
                       SizedBox(width: 6.w),
-                      Text(
-                        widget.adresse,
-                        style: getInterStyle(
-                          fontSize: 13.sp,
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w400,
+                      Expanded(
+                        child: Text(
+                          widget.mission.structureAddress ?? '',
+                          style: getInterStyle(
+                            fontSize: 13.sp,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -178,7 +217,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                       Icon(Icons.access_time_outlined, color: Colors.white70, size: 16.sp),
                       SizedBox(width: 6.w),
                       Text(
-                        widget.horaires,
+                        '${widget.mission.horaireMission?.hour.toString().padLeft(2, '0')}:${widget.mission.horaireMission?.minute.toString().padLeft(2, '0')} - ${widget.mission.heureFin ?? "..."}',
                         style: getInterStyle(
                           fontSize: 13.sp,
                           color: Colors.white70,
@@ -196,7 +235,76 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
+  Widget _buildGeneralInfoSection(MissionModel mission, LanguageProvider lang) {
+    String translateList(List<String> items) {
+      return items
+          .map((e) {
+            final key = e.toLowerCase().replaceAll(' ', '_');
+            return lang.translate(key) ?? e;
+          })
+          .toList()
+          .join(', ');
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            lang.translate('mission_general_info') ?? 'Informations générales',
+            style: getInterStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+          ),
+          SizedBox(height: 12.h),
+          _buildInfoRow(lang.translate('avg_residents_day'), mission.nbResidentsJour.toString()),
+          if (mission.typesRepas.isNotEmpty)
+            _buildInfoRow(lang.translate('meal_types'), translateList(mission.typesRepas)),
+          if (mission.regimesSpeciaux.isNotEmpty)
+            _buildInfoRow(lang.translate('special_diets'), translateList(mission.regimesSpeciaux)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String? label, String? value) {
+    if (label == null || label.isEmpty || value == null || value.isEmpty) return SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 1,
+            child: Text(
+              '$label :',
+              style: getInterStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              style: getInterStyle(fontSize: 14.sp, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccesLogistique() {
+    final lang = Provider.of<LanguageProvider>(context);
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       padding: EdgeInsets.all(16.w),
@@ -220,7 +328,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               Icon(Icons.location_on_outlined, color: Color(0xFF0059AB), size: 22.sp),
               SizedBox(width: 8.w),
               Text(
-                'Accès & Logistique',
+                lang.translate('access_logistics') ?? 'Accès & Logistique',
                 style: getInterStyle(
                   fontSize: 16.sp,
                   color: Colors.black87,
@@ -233,12 +341,12 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           SizedBox(height: 16.h),
           
           // Code entrée
-          _buildCodeRow('Code entrée', 'A1234'),
+          _buildCodeRow(lang.translate('entry_code'), widget.mission.codeEntree ?? '...'),
           
           SizedBox(height: 12.h),
           
           // Code cuisine
-          _buildCodeRow('Code cuisine', 'A1234'),
+          _buildCodeRow(lang.translate('kitchen_code'), widget.mission.codeCuisine ?? '...'),
           
           SizedBox(height: 16.h),
           
@@ -246,12 +354,29 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // Action appeler
+              onPressed: () async {
+                final phone = widget.mission.structurePhone;
+                if (phone != null && phone.isNotEmpty) {
+                  final Uri launchUri = Uri(
+                    scheme: 'tel',
+                    path: phone,
+                  );
+                  if (await canLaunchUrl(launchUri)) {
+                    await launchUrl(launchUri);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Impossible de lancer l\'appel')),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Numéro de téléphone non disponible')),
+                  );
+                }
               },
               icon: Icon(Icons.phone_outlined, size: 18.sp, color: Color(0xFF0059AB)),
               label: Text(
-                'Appeler le contact',
+                lang.translate('call_contact') ?? 'Appeler le contact',
                 style: getInterStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
@@ -311,7 +436,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               Clipboard.setData(ClipboardData(text: code));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Code copié !'),
+                  content: Text(Provider.of<LanguageProvider>(context, listen: false).translate('code_copied')),
                   duration: Duration(seconds: 1),
                   backgroundColor: Color(0xFF0059AB),
                 ),
@@ -319,7 +444,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             },
             icon: Icon(Icons.copy_outlined, size: 16.sp),
             label: Text(
-              'Copier',
+              Provider.of<LanguageProvider>(context, listen: false).translate('copy'),
               style: getInterStyle(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w500,
@@ -335,91 +460,111 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
-  Widget _buildMenuDuJour() {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Titre avec icône toque de chef
-          Row(
-            children: [
-              // Icône toque de chef
-              Image.asset(
-                'assets/images/chef.png',
-                width: 24.w,
-                height: 24.h,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 24.w,
-                    height: 24.h,
-                    child: CustomPaint(
-                      painter: ChefHatPainter(color: Color(0xFF0059AB)),
-                    ),
-                  );
-                },
-              ),
-              SizedBox(width: 10.w),
-              Text(
-                'Menu du jour',
-                style: getInterStyle(
-                  fontSize: 16.sp,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w700,
-                ),
+  Widget _buildMenuDuJour(LanguageProvider lang) {
+    final repas = widget.mission.repas;
+    if (repas.isEmpty) return SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+
+        ...repas.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final r = entry.value;
+        bool isSimple = r.typeRepas == 'breakfast' || r.typeRepas == 'snack';
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          
-          SizedBox(height: 20.h),
-          
-          // Entrée
-          _buildMenuItemWithBorder('Entrée', 'Salade de tomates'),
-          
-          SizedBox(height: 12.h),
-          
-          // Plat
-          _buildMenuItemWithBorder('Plat', 'Poulet rôti'),
-          
-          SizedBox(height: 12.h),
-          
-          // Accompagnement
-          _buildMenuItemWithBorder('Accompagnement', 'Riz pilaf'),
-          
-          SizedBox(height: 12.h),
-          
-          // Dessert
-          _buildMenuItemWithBorder('Dessert', 'Compote de pommes'),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Titre du repas (Déjeuner, Dîner, etc.)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Image.asset('assets/images/chef.png', width: 18.sp, height: 18.sp),
+                      SizedBox(width: 10.w),
+                      Text(
+                        'MENU',
+                        style: getInterStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    '${widget.mission.repas.length > 1 ? 'Repas ${idx + 1} - ' : ''}${lang.translate(r.typeRepas).toUpperCase()}',
+                    style: getInterStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0059AB),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              
+              if (isSimple)
+                _buildMenuItemWithBorder(lang.translate('meal_description'), r.getDisplayName('simple'), r.simpleRecettes.isNotEmpty ? r.simpleRecettes : (r.simpleRecette != null ? [r.simpleRecette!] : []))
+              else ...[
+                if (r.getDisplayName('entree').isNotEmpty)
+                  _buildMenuItemWithBorder(lang.translate('starter_label'), r.getDisplayName('entree'), r.entreeRecettes.isNotEmpty ? r.entreeRecettes : (r.entreeRecette != null ? [r.entreeRecette!] : [])),
+                if (r.getDisplayName('entree').isNotEmpty) SizedBox(height: 10.h),
+                
+                if (r.getDisplayName('plat').isNotEmpty)
+                  _buildMenuItemWithBorder(lang.translate('dish_label'), r.getDisplayName('plat'), r.platRecettes.isNotEmpty ? r.platRecettes : (r.platRecette != null ? [r.platRecette!] : [])),
+                if (r.getDisplayName('plat').isNotEmpty) SizedBox(height: 10.h),
+                
+                if (r.getDisplayName('side').isNotEmpty)
+                  _buildMenuItemWithBorder(lang.translate('side_label'), r.getDisplayName('side'), r.accompagnementRecettes.isNotEmpty ? r.accompagnementRecettes : (r.accompagnementRecette != null ? [r.accompagnementRecette!] : [])),
+                if (r.getDisplayName('side').isNotEmpty) SizedBox(height: 10.h),
+                
+                if (r.getDisplayName('dessert').isNotEmpty)
+                  _buildMenuItemWithBorder(lang.translate('dessert_label'), r.getDisplayName('dessert'), r.dessertRecettes.isNotEmpty ? r.dessertRecettes : (r.dessertRecette != null ? [r.dessertRecette!] : [])),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+      ],
     );
   }
 
-  // Icône toque de chef personnalisée
-  Widget _buildChefHatIcon() {
-    return Container(
-      width: 24.w,
-      height: 24.h,
-      child: CustomPaint(
-        painter: ChefHatPainter(color: Color(0xFF0059AB)),
-      ),
-    );
-  }
 
-  Widget _buildMenuItemWithBorder(String category, String name) {
+
+  Widget _buildMenuItemWithBorder(String category, String name, List<RecipeModel> recipes) {
+    // Extraire tous les ingrédients des recettes associées
+    List<String> allIngredients = [];
+    for (var recipe in recipes) {
+      if (recipe.ingredients != null) {
+        for (var ing in recipe.ingredients!) {
+          String nom = (ing['nom'] ?? ing['ingredient'] ?? '').toString();
+          String qty = (ing['quantite'] ?? ing['amount'] ?? '').toString();
+          if (nom.isNotEmpty) {
+            allIngredients.add(qty.isNotEmpty ? "$nom ($qty)" : nom);
+          }
+        }
+      }
+    }
+
+    bool isExpanded = _expandedRecipes.contains(name);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -451,27 +596,90 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            
+            
+            if (_expandedRecipes.contains(name)) ...[
+              SizedBox(height: 12.h),
+              // Détails des recettes
+              ...recipes.map((recipe) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (recipes.length > 1)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 4.h),
+                        child: Text(recipe.nom, style: getInterStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      ),
+                    
+                    if (recipe.tempsPreparation != null && recipe.tempsPreparation!.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 6.h),
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer_outlined, size: 14.sp, color: Color(0xFF0059AB)),
+                            SizedBox(width: 4.w),
+                            Text(
+                              "Temps : ${recipe.tempsPreparation}",
+                              style: getInterStyle(fontSize: 12.sp, color: Colors.grey[700], fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                    if (recipe.description != null && recipe.description!.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 8.h),
+                        child: Text(
+                          recipe.description!,
+                          style: getInterStyle(fontSize: 13.sp, color: Colors.black87, height: 1.4),
+                        ),
+                      ),
+
+                    if (allIngredients.isNotEmpty)
+                      Text(
+                        "Ingrédients : ${allIngredients.join(', ')}",
+                        style: getInterStyle(
+                          fontSize: 12.sp,
+                          color: Color(0xFF0059AB),
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    SizedBox(height: 12.h),
+                  ],
+                );
+              }).toList(),
+            ],
             SizedBox(height: 8.h),
-            GestureDetector(
-              onTap: () {
-                // Navigation vers la recette
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Voir la recette',
-                    style: getInterStyle(
-                      fontSize: 12.sp,
-                      color: Color(0xFF0085FF),
-                      fontWeight: FontWeight.w500,
+            if (allIngredients.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedRecipes.remove(name);
+                    } else {
+                      _expandedRecipes.add(name);
+                    }
+                  });
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isExpanded 
+                          ? (Provider.of<LanguageProvider>(context, listen: false).translate('hide_recipe') ?? 'Masquer les ingrédients')
+                          : (Provider.of<LanguageProvider>(context, listen: false).translate('view_recipe') ?? 'Voir la recette'),
+                      style: getInterStyle(
+                        fontSize: 12.sp,
+                        color: Color(0xFF0085FF),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.chevron_right, size: 16.sp, color: Color(0xFF0085FF)),
-                ],
+                    SizedBox(width: 2.w),
+                    Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 16.sp, color: Color(0xFF0085FF)),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -479,6 +687,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   }
 
   Widget _buildQuantitesCalculees() {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       padding: EdgeInsets.all(16.w),
@@ -497,7 +706,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Quantités calculées',
+            lang.translate('calculated_quantities') ?? 'Quantités calculées',
             style: getInterStyle(
               fontSize: 16.sp,
               color: Colors.black87,
@@ -507,7 +716,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           
           SizedBox(height: 16.h),
           
-          // Box avec résidents
+          // Box avec résidents et chefs
           Container(
             width: double.infinity,
             padding: EdgeInsets.all(12.w),
@@ -518,25 +727,26 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildResidentRow('Résidents', '100', isHighlighted: true),
-                SizedBox(height: 4.h),
-                _buildResidentRow('Haché', '12'),
-                SizedBox(height: 4.h),
-                _buildResidentRow('Mixé', '5'),
-                SizedBox(height: 4.h),
-                _buildResidentRow('Mouliné', '3'),
+                _buildResidentRow(lang.translate('residents') ?? 'Résidents', '${widget.mission.nbResidentsJour}', isHighlighted: true),
+                SizedBox(height: 8.h),
+                _buildResidentRow(lang.translate('chefs_needed') ?? 'Chefs requis', '${widget.mission.nbChefs}', isHighlighted: true),
+                
+                // Ajout de la répartition par texture
+                if (widget.mission.regimesSpecifiques.haches > 0 || 
+                    widget.mission.regimesSpecifiques.mixes > 0 || 
+                    widget.mission.regimesSpecifiques.moulines > 0) ...[
+                  Divider(height: 20.h, color: Color(0xFF0059AB).withOpacity(0.1)),
+                  Text('Répartition par texture :', style: getInterStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: Color(0xFF0059AB))),
+                  SizedBox(height: 8.h),
+                  _buildResidentRow('Hachés', '${widget.mission.regimesSpecifiques.haches}'),
+                  _buildResidentRow('Mixés', '${widget.mission.regimesSpecifiques.mixes}'),
+                  _buildResidentRow('Moulinés', '${widget.mission.regimesSpecifiques.moulines}'),
+                ],
               ],
             ),
           ),
           
-          SizedBox(height: 16.h),
-          
-          // Quantités ingrédients
-          _buildQuantityRow('Viande', '3,5 kg'),
-          Divider(height: 16.h, color: Colors.grey[200]),
-          _buildQuantityRow('Riz', '2 kg'),
-          Divider(height: 16.h, color: Colors.grey[200]),
-          _buildQuantityRow('Légumes', '1,7 kg'),
+          // Section supprimée: Viande, Légumes, Riz/Féc.
         ],
       ),
     );
@@ -595,6 +805,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   }
 
   Widget _buildChecklistJournee() {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
       padding: EdgeInsets.all(16.w),
@@ -613,7 +824,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Checklist journée',
+            lang.translate('daily_checklist') ?? 'Checklist journée',
             style: getInterStyle(
               fontSize: 16.sp,
               color: Colors.black87,
@@ -624,20 +835,34 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           SizedBox(height: 12.h),
           
           // Liste des tâches
-          ...checklist.entries.map((entry) => _buildChecklistItem(entry.key, entry.value)),
+          ...checklist.entries.map((entry) {
+            final key = entry.key.toLowerCase() == 'ouverture' ? 'opening' : 
+                        entry.key.toLowerCase() == 'frigos' ? 'fridges' :
+                        entry.key.toLowerCase() == 'préparation' ? 'preparation' :
+                        entry.key.toLowerCase() == 'textures' ? 'textures' :
+                        entry.key.toLowerCase() == 'dressage' ? 'plating' :
+                        entry.key.toLowerCase() == 'nettoyage' ? 'cleaning' :
+                        entry.key.toLowerCase() == 'signature' ? 'signature' : entry.key;
+            return _buildChecklistItem(lang.translate(key) ?? entry.key, entry.value, entry.key);
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildChecklistItem(String label, bool isChecked) {
+  Widget _buildChecklistItem(String label, bool isChecked, String originalKey) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 6.h),
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
           setState(() {
-            checklist[label] = !checklist[label]!;
+            checklist[originalKey] = !isChecked;
           });
+          try {
+            await _missionService.updateChecklist(widget.mission.id, checklist);
+          } catch (e) {
+            debugPrint('Erreur lors de la mise à jour de la checklist: $e');
+          }
         },
         child: Row(
           children: [
@@ -674,136 +899,575 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w),
-      child: Column(
-        children: [
-          // Bouton Signaler un incident (rouge)
-          SizedBox(
-            width: double.infinity,
-            height: 52.h,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Action signaler incident
-              },
-              icon: Image.asset(
-                'assets/images/icon_incident.png',
-                width: 20.w,
-                height: 20.h,
-                color: Colors.white,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(Icons.warning_amber_outlined, size: 20.sp, color: Colors.white);
-                },
-              ),
-              label: Text(
-                'Signaler un incident',
-                style: getInterStyle(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFE53935),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
+  Widget _buildAdminNotes() {
+    final lang = Provider.of<LanguageProvider>(context, listen: false);
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Color(0xFFFFF9C4), // Jaune clair pour une note
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
-          
-          SizedBox(height: 12.h),
-          
-          // Bouton Terminer la mission (vert)
-          SizedBox(
-            width: double.infinity,
-            height: 52.h,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Action terminer mission
-              },
-              icon: Icon(Icons.check_circle_outline, size: 20.sp),
-              label: Text(
-                'Terminer la mission',
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.event_note, color: Colors.orange[800], size: 22.sp),
+              SizedBox(width: 8.w),
+              Text(
+                lang.translate('admin_notes') ?? 'Notes Administrateur',
                 style: getInterStyle(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  fontSize: 16.sp,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF4CAF50),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Text(
+            widget.mission.adminComments!,
+            style: getInterStyle(
+              fontSize: 14.sp,
+              color: Colors.black87,
+              height: 1.5,
+              fontStyle: FontStyle.italic,
             ),
           ),
         ],
       ),
     );
   }
+
+  Future<void> _finishMission() async {
+    // Vérifier que toute la checklist est cochée
+    bool allChecked = checklist.values.every((value) => value == true);
+    if (!allChecked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez cocher tous les éléments de la checklist avant de terminer la mission'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isFinishing = true);
+    try {
+      await _missionService.finishMission(widget.mission.id);
+      if (mounted) {
+        setState(() => _isFinishing = false);
+        _showFeedbackDialog();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFinishing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
+  }
+
+  void _showFeedbackDialog() {
+    double rating = 5.0;
+    final TextEditingController commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Column(
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.green, size: 48.sp),
+              SizedBox(height: 12.h),
+              Text("Mission Terminée !", style: getInterStyle(fontSize: 18.sp, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Votre avis nous intéresse. Comment s'est passée votre mission ?", 
+                textAlign: TextAlign.center,
+                style: getInterStyle(fontSize: 14.sp, color: Colors.grey[700])),
+              SizedBox(height: 20.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    icon: Icon(
+                      index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: Colors.amber,
+                      size: 32.sp,
+                    ),
+                    onPressed: () {
+                      setDialogState(() => rating = index + 1.0);
+                    },
+                  );
+                }),
+              ),
+              SizedBox(height: 16.h),
+              TextField(
+                controller: commentController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: "Un commentaire ? (Optionnel)",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              height: 48.h,
+              child: ElevatedButton(
+                onPressed: isSubmitting ? null : () async {
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    final String content = "⭐ FEEDBACK: [Note: $rating/5] ${commentController.text.trim()}";
+                    await _missionService.sendChatMessage(widget.mission.id, content, type: 'feedback');
+                    
+                    if (mounted) {
+                      Navigator.pop(context); // Fermer dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Merci pour votre retour !"), backgroundColor: Colors.green),
+                      );
+                      Navigator.pop(context, true); // Quitter le détail de mission
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      setDialogState(() => isSubmitting = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Erreur lors de l'envoi : $e")),
+                      );
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0059AB),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: isSubmitting 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text("Envoyer mon avis", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context, true), // Quitter sans envoyer mais avec refresh
+                child: Text("Passer pour l'instant", style: TextStyle(color: Colors.grey[600])),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(LanguageProvider langProvider) {
+    final String? userStatus = widget.mission.userStatus;
+    final bool isActuallyAssignedToMe = widget.mission.professionnelId != null && userStatus == 'confirmé';
+    final bool isAssignedToOther = widget.mission.professionnelId != null && userStatus != 'confirmé';
+    final bool isRefused = userStatus == 'refusé';
+    final missionProvider = Provider.of<MissionProvider>(context);
+    final bool hasOngoing = missionProvider.hasOngoingMission;
+
+    if (userStatus == 'refusé') {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Text(
+            langProvider.translate('you_refused_mission'),
+            style: getInterStyle(fontSize: 15.sp, color: Colors.red, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    // DEBUG: Print mission and user status
+    debugPrint('🔍 [DEBUG] _buildActionButtons:');
+    debugPrint('   - mission.status: ${widget.mission.status}');
+    debugPrint('   - mission.userStatus: ${widget.mission.userStatus}');
+    debugPrint('   - mission.professionnelId: ${widget.mission.professionnelId}');
+    debugPrint('   - isRefused: $isRefused');
+    debugPrint('   - isAssignedToOther: $isAssignedToOther');
+    debugPrint('   - isActuallyAssignedToMe: $isActuallyAssignedToMe');
+
+    if (isRefused) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Text(
+            langProvider.translate('you_refused_mission'),
+            style: getInterStyle(fontSize: 15.sp, color: Colors.red, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    if (isAssignedToOther) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Text(
+            langProvider.translate('already_assigned_other'),
+            style: getInterStyle(fontSize: 15.sp, color: Colors.grey, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    // Affiche les boutons d'acceptation/refus SEULEMENT si la mission n'est pas déjà acceptée
+    if (widget.mission.status == 'en attente' && userStatus != 'confirmé') {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 52.h,
+                child: ElevatedButton(
+                  onPressed: _isAccepting ? null : _rejectMission,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red,
+                    side: BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    langProvider.translate('refuse'),
+                    style: getInterStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 16.w),
+            Expanded(
+              child: SizedBox(
+                height: 52.h,
+                child: ElevatedButton(
+                  onPressed: (_isAccepting || (hasOngoing && widget.mission.status.toLowerCase() != 'en cours')) 
+                      ? null 
+                      : _acceptMission,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: (hasOngoing && widget.mission.status.toLowerCase() != 'en cours') 
+                        ? Colors.grey 
+                        : Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: _isAccepting
+                      ? SizedBox(
+                          width: 20.w,
+                          height: 20.h,
+                          child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : (hasOngoing && widget.mission.status.toLowerCase() != 'en cours')
+                          ? Text(
+                              'Mission en cours...',
+                              style: getInterStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              langProvider.translate('accept'),
+                              style: getInterStyle(
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (widget.mission.status == 'terminé') {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Text(
+            'Cette mission est terminée',
+            style: getInterStyle(fontSize: 15.sp, color: Colors.green, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    // Affiche les boutons uniquement si la mission est acceptée par le professionnel
+    if (!isActuallyAssignedToMe) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Text(
+            langProvider.translate('mission_not_accepted_yet') ?? 'Vous devez accepter la mission avant de pouvoir accéder à ces actions.',
+            style: getInterStyle(fontSize: 15.sp, color: Colors.grey, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Bouton Signaler un incident (rouge)
+            SizedBox(
+              width: double.infinity,
+              height: 52.h,
+              child: ElevatedButton.icon(
+                onPressed: () => _showIncidentDialog(langProvider),
+                icon: Image.asset(
+                  'assets/images/icon_incident.png',
+                  width: 20.w,
+                  height: 20.h,
+                  color: Colors.white,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.warning_amber_outlined, size: 20.sp, color: Colors.white);
+                  },
+                ),
+                label: Text(
+                  langProvider.translate('report_incident'),
+                  style: getInterStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFE53935),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            
+
+            
+            SizedBox(height: 20.h),
+            
+            // Bouton Terminer la mission (vert)
+            SizedBox(
+              width: double.infinity,
+              height: 52.h,
+              child: ElevatedButton.icon(
+                onPressed: _isFinishing ? null : _finishMission,
+                icon: _isFinishing 
+                  ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Icon(Icons.check_circle_outline, size: 20.sp),
+                label: Text(
+                  langProvider.translate('finish_mission') ?? 'Terminer la mission',
+                  style: getInterStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showIncidentDialog(LanguageProvider lang) {
+    String selectedType = 'Matériel';
+    final TextEditingController descriptionController = TextEditingController();
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 10.w),
+              Text("Signaler un incident", style: getInterStyle(fontSize: 18.sp, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Type d'incident", style: getInterStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedType,
+                    isExpanded: true,
+                    items: ['Matériel', 'Retard', 'Santé', 'Cuisine', 'Autre'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedType = val);
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text("Description", style: getInterStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+              SizedBox(height: 8.h),
+              TextField(
+                controller: descriptionController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: "Décrivez le problème...",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Annuler", style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: isSending ? null : () async {
+                if (descriptionController.text.trim().isEmpty) return;
+                
+                setDialogState(() => isSending = true);
+                try {
+                  final String content = "🚨 INCIDENT: [$selectedType] ${descriptionController.text.trim()}";
+                  await _missionService.sendChatMessage(widget.mission.id, content, type: 'incident');
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Incident signalé à l'administration"), backgroundColor: Colors.orange),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    setDialogState(() => isSending = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Erreur lors de l'envoi : $e"), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: isSending 
+                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text("Envoyer", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _acceptMission() async {
+    setState(() => _isAccepting = true);
+    try {
+      await _missionService.acceptMission(widget.mission.id);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(Provider.of<LanguageProvider>(context, listen: false).translate('mission_accepted_msg')),
+            backgroundColor: Color(0xFF4CAF50),
+          ),
+        );
+        Navigator.pop(context, true); // Le true indique qu'une mise à jour est nécessaire
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${Provider.of<LanguageProvider>(context, listen: false).translate('error')} : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAccepting = false);
+      }
+    }
+  }
+
+  Future<void> _rejectMission() async {
+    setState(() => _isAccepting = true);
+    try {
+      await _missionService.rejectMission(widget.mission.id);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(Provider.of<LanguageProvider>(context, listen: false).translate('mission_refused')),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${Provider.of<LanguageProvider>(context, listen: false).translate('error')} : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAccepting = false);
+      }
+    }
+  }
 }
 
-// Painter pour dessiner l'icône toque de chef
-class ChefHatPainter extends CustomPainter {
-  final Color color;
-  
-  ChefHatPainter({required this.color});
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    
-    final w = size.width;
-    final h = size.height;
-    
-    final path = Path();
-    
-    // Partie haute de la toque (forme arrondie comme un nuage)
-    // Commencer en bas à gauche
-    path.moveTo(w * 0.18, h * 0.72);
-    
-    // Monter sur le côté gauche
-    path.lineTo(w * 0.18, h * 0.45);
-    
-    // Arc gauche de la toque
-    path.quadraticBezierTo(w * 0.18, h * 0.22, w * 0.35, h * 0.18);
-    
-    // Arc central haut
-    path.quadraticBezierTo(w * 0.5, h * 0.08, w * 0.65, h * 0.18);
-    
-    // Arc droit de la toque
-    path.quadraticBezierTo(w * 0.82, h * 0.22, w * 0.82, h * 0.45);
-    
-    // Descendre sur le côté droit
-    path.lineTo(w * 0.82, h * 0.72);
-    
-    canvas.drawPath(path, paint);
-    
-    // Bandeau du bas (rectangle arrondi)
-    final bandPath = Path();
-    bandPath.moveTo(w * 0.15, h * 0.72);
-    bandPath.lineTo(w * 0.85, h * 0.72);
-    bandPath.lineTo(w * 0.85, h * 0.88);
-    bandPath.quadraticBezierTo(w * 0.85, h * 0.95, w * 0.78, h * 0.95);
-    bandPath.lineTo(w * 0.22, h * 0.95);
-    bandPath.quadraticBezierTo(w * 0.15, h * 0.95, w * 0.15, h * 0.88);
-    bandPath.close();
-    
-    canvas.drawPath(bandPath, paint);
-  }
-  
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
+

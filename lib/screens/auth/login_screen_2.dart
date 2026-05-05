@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 import '../professionnel_screen/home_screen.dart';
 import 'login_screen22.dart';
@@ -11,6 +12,7 @@ import '../professionnel_screen/professionnel_home_screen.dart';
 import '../client_screen/client_home_screen.dart';
 import '../admin_screen/admin_home_screen.dart';
 import 'forgot_password_screen.dart';
+import 'pending_validation_screen.dart';
 import 'dart:math' as math;
 
 class LoginScreen2 extends StatefulWidget {
@@ -32,179 +34,80 @@ class _LoginScreen2State extends State<LoginScreen2> {
     _passwordController.dispose();
     super.dispose();
   }
-
-  Future<void> _handleLogin() async {
+    Future<void> _handleLogin() async {
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       
-      await Future.delayed(Duration(seconds: 1));
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      setState(() => _isLoading = false);
+      final result = await authProvider.loginWithCode(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
       
-      // MODE TEST: Afficher un dialog pour choisir le type de compte
-      // TODO: Quand le backend sera prêt, le type sera déterminé par l'API
-      _showUserTypeDialog(Provider.of<LanguageProvider>(context, listen: false));
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        final code = result['code'];
+        final success = result['success'] == true;
+
+        if (code == 'pending_validation') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PendingValidationScreen(
+                isRefused: false,
+                userRole: result['role'] ?? 'professionnel',
+              ),
+            ),
+          );
+          return;
+        }
+
+        if (code == 'account_refused') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PendingValidationScreen(
+                isRefused: true,
+                userRole: result['role'] ?? 'professionnel',
+              ),
+            ),
+          );
+          return;
+        }
+
+        if (success) {
+          final user = authProvider.user;
+          
+          if (user?.role == 'client') {
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (context) => ClientHomeScreen()));
+          } else if (user?.role == 'professionnel') {
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (context) => ProfessionnelHomeScreen()));
+          } else if (user?.role == 'admin') {
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (context) => AdminHomeScreen()));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(langProvider.translate("role_not_recognized"))),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? authProvider.errorMessage ?? langProvider.translate("login_failed")),
+              backgroundColor: Colors.red[700],
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
 
-  void _showUserTypeDialog(LanguageProvider langProvider) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            langProvider.translate('test_mode'),
-            style: getSourceSerifProStyle(
-              fontSize: 18.sp,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                langProvider.translate('choose_account_type'),
-                style: getSourceSerifProStyle(
-                  fontSize: 14.sp,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 24.h),
-              // Bouton Professionnel
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProfessionnelHomeScreen(
-                          userEmail: _emailController.text,
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0059AB),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 14.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.work_outline, size: 20.sp),
-                      SizedBox(width: 8.w),
-                      Text(
-                        langProvider.translate('professional'),
-                        style: getSourceSerifProStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 12.h),
-              // Bouton Client
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ClientHomeScreen(
-                          userEmail: _emailController.text,
-                          userName: 'Marie Dubois',
-                          etablissementName: 'EHPAD Les Jardins',
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CA054),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 14.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.business_outlined, size: 20.sp),
-                      SizedBox(width: 8.w),
-                      Text(
-                        langProvider.translate('client_establishment'),
-                        style: getSourceSerifProStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 12.h),
-              // Bouton Admin
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AdminHomeScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C39D3),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 14.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.admin_panel_settings_outlined, size: 20.sp),
-                      SizedBox(width: 8.w),
-                      Text(
-                        langProvider.translate('admin'),
-                        style: getSourceSerifProStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -455,7 +358,7 @@ class _LoginScreen2State extends State<LoginScreen2> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return langProvider.translate('error_message'); // Note: Should probably be error_password
+                      return langProvider.translate('error_password');
                     }
                     if (value.length < 6) {
                       return langProvider.translate('error_password_short');

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
 
@@ -18,6 +21,9 @@ class _AdminEditProfilScreenState extends State<AdminEditProfilScreen> {
   late TextEditingController _lastNameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  XFile? _imageFile;
+  Uint8List? _webImageBytes;
+  final ImagePicker _picker = ImagePicker();
   
   final Color _primaryPurple = const Color(0xFF7C39D3);
 
@@ -40,15 +46,46 @@ class _AdminEditProfilScreenState extends State<AdminEditProfilScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1000,
+        maxHeight: 1000,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _imageFile = pickedFile;
+          _webImageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de la sélection de l\'image: $e')),
+      );
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
+      dynamic photoData;
+      if (_imageFile != null && _webImageBytes != null) {
+        photoData = {
+          'bytes': _webImageBytes,
+          'name': _imageFile!.name,
+        };
+      }
+
       final success = await authProvider.updateProfile({
         'firstName': _firstNameController.text,
         'lastName': _lastNameController.text,
         'email': _emailController.text,
         'phone': _phoneController.text,
+        if (photoData != null) 'photo_profil_path': photoData,
       });
 
       if (success) {
@@ -76,7 +113,8 @@ class _AdminEditProfilScreenState extends State<AdminEditProfilScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = Provider.of<AuthProvider>(context).isLoading;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final isLoading = authProvider.isLoading;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: _primaryPurple,
@@ -95,33 +133,56 @@ class _AdminEditProfilScreenState extends State<AdminEditProfilScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: 100.w,
-                              height: 100.w,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                shape: BoxShape.circle,
-                                border: Border.all(color: _primaryPurple.withOpacity(0.2), width: 2),
-                              ),
-                              child: Icon(Icons.person, size: 50.w, color: _primaryPurple),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: EdgeInsets.all(8.w),
+                      GestureDetector(
+                        onTap: isLoading ? null : _pickImage,
+                        child: Center(
+                          child: Stack(
+                            children: [
+                              Container(
+                                width: 100.w,
+                                height: 100.w,
                                 decoration: BoxDecoration(
-                                  color: _primaryPurple,
+                                  color: Colors.grey[100],
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(
+                                      color: _primaryPurple.withOpacity(0.2),
+                                      width: 2),
+                                  image: _imageFile != null
+                                      ? DecorationImage(
+                                          image: (kIsWeb && _webImageBytes != null)
+                                              ? MemoryImage(_webImageBytes!)
+                                              : FileImage(File(_imageFile!.path)) as ImageProvider,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : (authProvider.user?.photoProfil != null
+                                          ? DecorationImage(
+                                              image: NetworkImage(authProvider.user!.photoProfil!),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null),
                                 ),
-                                child: Icon(Icons.camera_alt, size: 16.w, color: Colors.white),
+                                child: _imageFile == null &&
+                                        authProvider.user?.photoProfil == null
+                                    ? Icon(Icons.person,
+                                        size: 50.w, color: _primaryPurple)
+                                    : null,
                               ),
-                            ),
-                          ],
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: EdgeInsets.all(8.w),
+                                  decoration: BoxDecoration(
+                                    color: _primaryPurple,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: Icon(Icons.camera_alt,
+                                      size: 16.w, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       SizedBox(height: 32.h),

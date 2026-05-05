@@ -201,12 +201,12 @@ class ClientParametresScreen extends StatelessWidget {
             onTap: () async {
               // Partager l'application
               await Share.share(
-                'Découvrez ARS App - L\'application pour les établissements de santé !\n\n'
+                '${langProvider.translate('share_text')}\n\n'
                 'Téléchargez l\'application :\n'
                 '📱 iOS : https://apps.apple.com/app/ars-app\n'
                 '📱 Android : https://play.google.com/store/apps/details?id=com.ars.app\n\n'
-                'Simplifiez la gestion de vos missions de restauration !',
-                subject: 'ARS App - Application pour établissements de santé',
+                '${langProvider.translate('share_app_footer') ?? 'Simplifiez la gestion de vos missions de restauration !'}',
+                subject: 'ARS App',
               );
             },
           ),

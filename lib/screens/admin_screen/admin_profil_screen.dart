@@ -10,6 +10,7 @@ import 'admin_edit_profil_screen.dart';
 import 'admin_home_screen.dart';
 import 'admin_missions_screen.dart';
 import 'admin_equipe_screen.dart';
+import 'admin_change_password_screen.dart';
 import 'admin_settings_screen.dart';
 
 class AdminProfilScreen extends StatefulWidget {
@@ -46,7 +47,9 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
         backgroundColor: const Color(0xFFF5F7FA),
         body: Column(
           children: [
-            _buildHeader(user?.fullName ?? langProvider.translate('administrator'), langProvider),
+            _buildHeader(
+                user?.fullName ?? langProvider.translate('administrator'),
+                langProvider),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(20.w),
@@ -64,14 +67,23 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const AdminEditProfilScreen()),
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const AdminEditProfilScreen()),
                         );
                       },
                     ),
                     _buildActionBtn(
                       icon: Icons.lock_outline,
                       label: langProvider.translate('change_password'),
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const AdminChangePasswordScreen()),
+                        );
+                      },
                     ),
                     SizedBox(height: 32.h),
                     _buildLogoutBtn(langProvider),
@@ -87,15 +99,23 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
   }
 
   Widget _buildHeader(String name, LanguageProvider langProvider) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(color: _primaryPurple),
+      decoration: BoxDecoration(
+        color: _primaryPurple,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 20.h),
       child: Column(
         children: [
-          // Trait horizontal en haut
           Padding(
             padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top > 0 ? MediaQuery.of(context).padding.top + 8.h : 32.h,
+              top: MediaQuery.of(context).padding.top + 20.h,
               left: 12.w,
               right: 12.w,
             ),
@@ -121,16 +141,33 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
                 Container(
                   width: 100.w,
                   height: 100.w,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.person_outline,
-                      color: _primaryPurple,
-                      size: 50.sp,
-                    ),
+                  child: ClipOval(
+                    child: user?.photoProfil != null
+                        ? Image.network(
+                            user!.photoProfil!,
+                            width: 100.w,
+                            height: 100.w,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Center(
+                              child: Icon(
+                                Icons.person_outline,
+                                color: _primaryPurple,
+                                size: 50.sp,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              Icons.person_outline,
+                              color: _primaryPurple,
+                              size: 50.sp,
+                            ),
+                          ),
                   ),
                 ),
                 SizedBox(height: 12.h),
@@ -150,7 +187,10 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
     );
   }
 
-  Widget _buildInfoCard({required String name, required String email, required LanguageProvider langProvider}) {
+  Widget _buildInfoCard(
+      {required String name,
+      required String email,
+      required LanguageProvider langProvider}) {
     return Container(
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
@@ -170,7 +210,8 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
           const Divider(),
           _buildInfoRow(langProvider.translate('email'), email),
           const Divider(),
-          _buildInfoRow(langProvider.translate('role'), langProvider.translate('administrator')),
+          _buildInfoRow(langProvider.translate('role'),
+              langProvider.translate('administrator')),
         ],
       ),
     );
@@ -202,7 +243,10 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
     );
   }
 
-  Widget _buildActionBtn({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildActionBtn(
+      {required IconData icon,
+      required String label,
+      required VoidCallback onTap}) {
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h),
       child: InkWell(
@@ -226,7 +270,8 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
                 ),
               ),
               const Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 14.sp, color: Colors.grey[400]),
+              Icon(Icons.arrow_forward_ios,
+                  size: 14.sp, color: Colors.grey[400]),
             ],
           ),
         ),
@@ -274,7 +319,7 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home_outlined, Icons.home, langProvider.translate('home'), 0, langProvider),
-              _buildNavItem(Icons.card_giftcard_outlined, Icons.card_giftcard, langProvider.translate('missions'), 1, langProvider, imagePath: 'assets/images/missions.png'),
+              _buildNavItem(Icons.work_outline, Icons.work, langProvider.translate('missions'), 1, langProvider),
               _buildNavItem(Icons.people_outline, Icons.people, langProvider.translate('team'), 2, langProvider),
               _buildNavItem(Icons.settings_outlined, Icons.settings, langProvider.translate('admin_panel'), 3, langProvider),
               _buildNavItem(Icons.person_outline, Icons.person, langProvider.translate('profile'), 4, langProvider),
@@ -285,36 +330,33 @@ class _AdminProfilScreenState extends State<AdminProfilScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData iconOutline, IconData iconFilled, String label, int index, LanguageProvider langProvider, {String? imagePath}) {
+  Widget _buildNavItem(IconData iconOutline, IconData iconFilled, String label,
+      int index, LanguageProvider langProvider) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () {
         if (index == 0) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminHomeScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => AdminHomeScreen()));
         } else if (index == 1) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminMissionsScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => AdminMissionsScreen()));
         } else if (index == 2) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminEquipeScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => AdminEquipeScreen()));
         } else if (index == 3) {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AdminSettingsScreen()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => AdminSettingsScreen()));
         }
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          imagePath != null
-              ? Image.asset(
-                  imagePath,
-                  width: 24.w,
-                  height: 24.w,
-                  color: isSelected ? _primaryPurple : Colors.grey[400],
-                  fit: BoxFit.contain,
-                )
-              : Icon(
-                  isSelected ? iconFilled : iconOutline,
-                  color: isSelected ? _primaryPurple : Colors.grey[400],
-                  size: 24.sp,
-                ),
+          Icon(
+            isSelected ? iconFilled : iconOutline,
+            color: isSelected ? _primaryPurple : Colors.grey[400],
+            size: 24.sp,
+          ),
           SizedBox(height: 4.h),
           Text(
             label,

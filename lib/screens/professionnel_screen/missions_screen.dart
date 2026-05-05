@@ -6,6 +6,10 @@ import '../../utils/font_helper.dart';
 import '../../utils/header_color_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../services/mission_service.dart';
+import '../../models/mission_model.dart';
 import 'mission_detail_screen.dart';
 
 class MissionsScreen extends StatefulWidget {
@@ -16,56 +20,77 @@ class MissionsScreen extends StatefulWidget {
 }
 
 class _MissionsScreenState extends State<MissionsScreen> {
-  int _selectedTabIndex = 0; // Par défaut sur "À venir"
+  int _selectedTabIndex = 0;
+  bool _isLoading = false;
   
-  List<String> _getTabs(LanguageProvider langProvider) {
-    return [
-      langProvider.translate('upcoming'),
-      langProvider.translate('in_progress'),
-      langProvider.translate('completed'),
-    ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchMissions();
   }
 
-  // Missions à venir
-  final List<Map<String, dynamic>> _missionsAVenir = [
-    {
-      'etablissement': 'Hôpital Saint Joseph',
-      'adresse': '185 Rue Raymond Losserand, Paris 75014',
-      'horaires': '8h00 - 17h00',
-      'statut': 'en_attente',
-    },
-    {
-      'etablissement': 'EHPAD Les Jardins',
-      'adresse': '12 Rue de la Santé, Paris 75014',
-      'horaires': '7h30 - 16h00',
-      'statut': 'en_attente',
-    },
-  ];
+  Future<void> _fetchMissions() async {
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    setState(() => _isLoading = true);
+    try {
+      await Provider.of<MissionProvider>(context, listen: false).fetchMissions();
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${langProvider.translate('error')}: $e')),
+        );
+      }
+    }
+  }
 
-  // Missions en cours
-  final List<Map<String, dynamic>> _missionsEnCours = [
-    {
-      'etablissement': 'EHPAD Les Jardins',
-      'adresse': '12 Rue de la Santé, Paris 75014',
-      'horaires': '7h30 - 16h00',
-      'statut': 'en_attente',
-    },
-    {
-      'etablissement': 'EHPAD Les Jardins',
-      'adresse': '12 Rue de la Santé, Paris 75014',
-      'horaires': '7h30 - 16h00',
-      'statut': 'confirme',
-    },
-    {
-      'etablissement': 'EHPAD Les Jardins',
-      'adresse': '12 Rue de la Santé, Paris 75014',
-      'horaires': '7h30 - 16h00',
-      'statut': 'refuse',
-    },
-  ];
+  Future<void> _handleAction(int missionId, String action) async {
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final provider = Provider.of<MissionProvider>(context, listen: false);
+    bool success = false;
+    
+    setState(() => _isLoading = true);
+    
+    if (action == 'accept') {
+      success = await provider.acceptMission(missionId);
+    } else {
+      success = await provider.rejectMission(missionId);
+    }
+    
+    setState(() => _isLoading = false);
+    
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(action == 'accept' ? langProvider.translate('mission_confirmed') : langProvider.translate('mission_refused')),
+            backgroundColor: action == 'accept' ? Colors.green : Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${langProvider.translate('error')} : ${provider.error}')),
+        );
+      }
+    }
+  }
 
-  // Missions terminées (vide pour l'instant)
-  final List<Map<String, dynamic>> _missionsTerminees = [];
+  List<MissionModel> _getFilteredMissions() {
+    final allMissions = Provider.of<MissionProvider>(context).missions;
+    switch (_selectedTabIndex) {
+      case 0: // À venir (disponibles ou acceptées mais pas encore commencées)
+        return allMissions.where((m) => 
+          (m.status.toLowerCase() == 'en attente' || m.status.toLowerCase() == 'confirmé') && 
+          m.userStatus != 'refusé').toList();
+      case 1: // En cours
+        return allMissions.where((m) => m.status.toLowerCase() == 'en cours').toList();
+      case 2: // Terminées
+        return allMissions.where((m) => m.status.toLowerCase() == 'terminé').toList();
+      default:
+        return allMissions;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,52 +181,63 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     children: [
                       // Titre aligné à gauche
                       Text(
-                        langProvider.translate('missions'),
+                        langProvider.translate('my_missions'),
                         style: getInterStyle(
-                          fontSize: 24.sp,
+                          fontSize: 22.sp,
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      // Icône notification
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.white,
-                              size: 26.sp,
-                            ),
-                            onPressed: () {
-                              // Navigation vers notifications
-                            },
-                          ),
-                          Positioned(
-                            right: 8.w,
-                            top: 8.h,
-                            child: Container(
-                              width: 18.w,
-                              height: 18.h,
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '2',
-                                  style: getInterStyle(
-                                    fontSize: 10.sp,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                      
+                      // Icône notification avec badge
+                      Consumer2<NotificationProvider, MissionProvider>(
+                        builder: (context, notifProvider, missionProvider, child) {
+                          final int totalUnread = missionProvider.totalUnreadMessagesCount + missionProvider.newMissionsCount;
+                          
+                          return GestureDetector(
+                            onTap: null, // La cloche n'ouvre plus de page
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.notifications_outlined,
+                                  color: Colors.white,
+                                  size: 28.sp,
                                 ),
-                              ),
+                                if (totalUnread > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: BoxConstraints(
+                                        minWidth: 16.w,
+                                        minHeight: 16.w,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ],
                   ),
+
                   SizedBox(height: 16.h),
                   
                   // Onglets
@@ -231,17 +267,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
         });
       },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF004A8F) : Color(0xFF3C80C0),
+          color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
+          border: isSelected ? null : Border.all(color: Colors.white.withOpacity(0.1), width: 1),
         ),
         child: Text(
           tabs[index],
           style: getInterStyle(
-            fontSize: 13.sp,
+            fontSize: 15.sp,
             color: Colors.white,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ),
@@ -249,21 +286,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildMissionsList(LanguageProvider langProvider) {
-    // Sélectionner la liste selon l'onglet actif
-    List<Map<String, dynamic>> missions;
-    switch (_selectedTabIndex) {
-      case 0:
-        missions = _missionsAVenir;
-        break;
-      case 1:
-        missions = _missionsEnCours;
-        break;
-      case 2:
-        missions = _missionsTerminees;
-        break;
-      default:
-        missions = _missionsEnCours;
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator(color: Color(0xFF0059AB)));
     }
+
+    final missions = _getFilteredMissions();
 
     if (missions.isEmpty) {
       return Center(
@@ -302,7 +329,39 @@ class _MissionsScreenState extends State<MissionsScreen> {
     );
   }
 
-  Widget _buildMissionCard(Map<String, dynamic> mission, LanguageProvider langProvider) {
+  Widget _buildMissionCard(MissionModel mission, LanguageProvider langProvider) {
+    final nomStructure = mission.structureName ?? langProvider.translate('not_defined');
+    final adresse = mission.structureAddress ?? langProvider.translate('not_defined');
+    final horaires = '${mission.horaireMission?.hour.toString().padLeft(2, '0')}:${mission.horaireMission?.minute.toString().padLeft(2, '0')} - ${mission.heureFin ?? "..."}';
+    final displayProf = mission.professionnelNom ?? langProvider.translate('not_assigned');
+    
+    final bool isActedUpon = mission.userStatus == 'confirmé' || 
+                             mission.userStatus == 'refusé' ||
+                             mission.professionnelId != null;
+
+    final missionProvider = Provider.of<MissionProvider>(context, listen: false);
+    final bool hasOngoing = missionProvider.hasOngoingMission;
+    final bool isCurrentlyOngoing = mission.status.toLowerCase() == 'en cours';
+    
+    // Fallback status text for badge
+    final badgeStatus = mission.userStatus ?? 'en attente';
+
+    // compute relative day description
+    String relativeDate() {
+      if (mission.horaireMission == null) return '';
+      final now = DateTime.now();
+      final mDate = DateTime(mission.horaireMission!.year, mission.horaireMission!.month, mission.horaireMission!.day);
+      final diff = mDate.difference(DateTime(now.year, now.month, now.day)).inDays;
+      if (diff == 0) return langProvider.translate('today');
+      if (diff == 1) return langProvider.translate('tomorrow');
+      if (diff == -1) return langProvider.translate('yesterday');
+      return '';
+    }
+    final dateLabel = relativeDate();
+    final formattedDate = mission.horaireMission != null
+        ? '${mission.horaireMission!.day.toString().padLeft(2,'0')} ${_monthName(mission.horaireMission!.month)} ${mission.horaireMission!.year}'
+        : '';
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -321,28 +380,73 @@ class _MissionsScreenState extends State<MissionsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Nom de l'établissement et badge de statut
+          // premier bloc : date et structure
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  mission['etablissement'],
-                  style: getInterStyle(
-                    fontSize: 16.sp,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w700,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isActedUpon && dateLabel.isNotEmpty)
+                    Text(
+                      '$dateLabel${formattedDate.isNotEmpty ? ' - ' + formattedDate : ''}',
+                      style: getInterStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black.withOpacity(0.8),
+                        height: 1.0,
+                      ),
+                    ),
+                  if (!isActedUpon && dateLabel.isNotEmpty) SizedBox(height: 4.h),
+                  Text(
+                    nomStructure,
+                    style: getInterStyle(fontSize: 16.sp, color: Colors.black87, fontWeight: FontWeight.w700),
                   ),
-                ),
+                ],
               ),
-              SizedBox(width: 8.w),
-              _buildStatusBadge(mission['statut'], langProvider),
+              Row(
+                children: [
+                  if (mission.unreadMessagesCount > 0)
+                    Container(
+                      margin: EdgeInsets.only(right: 8.w),
+                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        mission.unreadMessagesCount.toString(),
+                        style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  _buildStatusBadge(badgeStatus, langProvider),
+                ],
+              ),
             ],
           ),
           
-          SizedBox(height: 12.h),
-          
+          if (!isActedUpon) SizedBox(height: 8.h),
+          // Professionnel assigné
+          if (!isActedUpon)
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 16.sp, color: Colors.grey[500]),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    displayProf,
+                    style: getInterStyle(
+                      fontSize: 13.sp, 
+                      color: Colors.grey[600], 
+                      fontWeight: FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          SizedBox(height: 8.h),
           // Adresse
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +459,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
               SizedBox(width: 6.w),
               Expanded(
                 child: Text(
-                  mission['adresse'],
+                  adresse,
                   style: getInterStyle(
                     fontSize: 13.sp,
                     color: Colors.grey[600],
@@ -365,20 +469,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
               ),
             ],
           ),
-          
           SizedBox(height: 8.h),
-          
           // Horaires
           Row(
             children: [
               Icon(
-                Icons.access_time_outlined,
+                Icons.access_time,
                 size: 16.sp,
                 color: Colors.grey[500],
               ),
               SizedBox(width: 6.w),
               Text(
-                mission['horaires'],
+                horaires,
                 style: getInterStyle(
                   fontSize: 13.sp,
                   color: Colors.grey[600],
@@ -388,6 +490,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
             ],
           ),
           
+          SizedBox(height: 8.h),
+          _buildCompactMenuBlock(mission, langProvider),
           SizedBox(height: 16.h),
           
           // Lien et boutons d'action
@@ -397,17 +501,21 @@ class _MissionsScreenState extends State<MissionsScreen> {
             children: [
               // Lien voir la mission
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  // Marquer la mission comme vue → badge disparaît
+                  Provider.of<MissionProvider>(context, listen: false)
+                      .markMissionAsViewed(mission.id);
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => MissionDetailScreen(
-                        etablissement: mission['etablissement'],
-                        adresse: mission['adresse'],
-                        horaires: mission['horaires'],
+                        mission: mission,
                       ),
                     ),
                   );
+                  if (result == true) {
+                    _fetchMissions();
+                  }
                 },
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -426,13 +534,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 ),
               ),
               
-              // Boutons d'action pour "en_attente"
-              if (mission['statut'] == 'en_attente')
+              if (!isActedUpon)
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildActionButton(langProvider.translate('refuse') == 'refuse' ? 'Refuser' : langProvider.translate('refuse'), Color(0xFFE53935), () {}),
+                    _buildActionButton(langProvider.translate('refuse'), Colors.red, () {
+                      _handleAction(mission.id, 'reject');
+                    }),
                     SizedBox(width: 8.w),
-                    _buildActionButton(langProvider.translate('confirm') == 'confirm' ? 'Confirmer' : langProvider.translate('confirm'), Color(0xFF4CAF50), () {}),
+                    _buildActionButton(
+                      langProvider.translate('confirm'), 
+                      hasOngoing ? Colors.grey : Colors.green, 
+                      hasOngoing 
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Terminez votre mission en cours avant d\'en accepter une nouvelle.')),
+                              );
+                            }
+                          : () => _handleAction(mission.id, 'accept'),
+                    ),
                   ],
                 ),
             ],
@@ -443,42 +563,46 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildStatusBadge(String statut, LanguageProvider langProvider) {
+    final String s = statut.toLowerCase().trim();
     Color bgColor;
     Color textColor;
     String text;
-    
-    switch (statut) {
-      case 'en_attente':
-        bgColor = Color(0xFFFAFCE5);
-        textColor = Color(0xFFBECB05);
-        text = langProvider.translate('pending');
-        break;
-      case 'confirme':
-        bgColor = Color(0xFFE8F5E9);
-        textColor = Color(0xFF4CAF50);
-        text = langProvider.translate('confirmed');
-        break;
-      case 'refuse':
-        bgColor = Color(0xFFFAE3E3);
-        textColor = Color(0xFFE53935);
-        text = langProvider.translate('refused');
-        break;
-      default:
-        bgColor = Colors.grey[200]!;
-        textColor = Colors.grey[600]!;
-        text = statut;
+
+    if (s == 'terminé' || s == 'terminée' || s == 'finished') {
+      text = langProvider.translate('finished');
+      bgColor = const Color(0xFFF5F5F5);
+      textColor = Colors.grey[600]!;
+    } else if (s == 'réfusé' || s == 'refusé' || s == 'refused' || s == 'annulé' || s == 'annulée') {
+      text = langProvider.translate('refused');
+      bgColor = const Color(0xFFFFEBEE);
+      textColor = const Color(0xFFD32F2F);
+    } else if (s == 'en cours' || s == 'in_progress') {
+      text = langProvider.translate('in_progress');
+      bgColor = const Color(0xFFE8F5E9);
+      textColor = const Color(0xFF4CAF50);
+    } else if (s == 'confirmé' || s == 'confirmée' || s == 'confirmed') {
+      text = langProvider.translate('confirmed');
+      bgColor = const Color(0xFFDCEEFB);
+      textColor = const Color(0xFF1565C0);
+    } else {
+      // Par défaut ou 'en attente' / 'planned'
+      text = s == 'en attente' ? langProvider.translate('pending_status') : s;
+      bgColor = const Color(0xFFE3F2FD);
+      textColor = const Color(0xFF0059AB);
     }
-    
+
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+      width: 55.w,
+      height: 19.h,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(5), // Radius: 5px
       ),
       child: Text(
         text,
         style: getInterStyle(
-          fontSize: 11.sp,
+          fontSize: 8.sp, // Réduit pour tenir dans 19px de hauteur
           color: textColor,
           fontWeight: FontWeight.w600,
         ),
@@ -505,6 +629,119 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ),
       ),
     );
+  }
+
+  List<String> _getTabs(LanguageProvider langProvider) {
+    return [
+      langProvider.translate('upcoming'),
+      langProvider.translate('in_progress'),
+      langProvider.translate('completed'),
+    ];
+  }
+
+  Widget _buildCompactMenuBlock(MissionModel mission, LanguageProvider langProvider) {
+    final mainRepas = mission.getMainRepas();
+    final bool hasMenu = mainRepas != null;
+    
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'MENU',
+                style: getInterStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+              if (hasMenu)
+                Text(
+                  langProvider.translate(mainRepas!.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0059AB).withOpacity(0.6),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          if (!hasMenu)
+            Text(
+              langProvider.translate('menu_not_communicated') == 'menu_not_communicated' ? 'Menu non communiqué' : langProvider.translate('menu_not_communicated'),
+              style: TextStyle(
+                fontSize: 13.sp, 
+                color: Colors.grey[400], 
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            _buildMenuRowsForMeal(mainRepas!, langProvider),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuRowsForMeal(RepasModel repas, LanguageProvider langProvider) {
+    return Column(
+      children: [
+        _buildSimplifiedMenuRow(langProvider.translate('starter_label'), repas.getDisplayName('entree')),
+        _buildSimplifiedMenuRow(langProvider.translate('dish_label'), repas.getDisplayName('plat')),
+        _buildSimplifiedMenuRow(langProvider.translate('side_label'), repas.getDisplayName('accompagnement')),
+        _buildSimplifiedMenuRow(langProvider.translate('dessert_label'), repas.getDisplayName('dessert')),
+      ],
+    );
+  }
+
+  Widget _buildSimplifiedMenuRow(String label, String value) {
+    if (value.isEmpty || value == '--') return const SizedBox.shrink();
+    
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label : ',
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF2D2D2D),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: const Color(0xFF666666),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _monthName(int month) {
+    const names = [
+      '',
+      'Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    return (month >= 1 && month <= 12) ? names[month] : '';
   }
 }
 

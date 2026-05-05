@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import 'inscription_client_step2_screen.dart';
 
 class InscriptionClientStep1Screen extends StatefulWidget {
@@ -20,13 +22,13 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
   
   String? _selectedTypeEtablissement;
   
-  final List<String> _typesEtablissement = [
-    'EHPAD',
-    'Résidence seniors',
-    'Hôpital',
-    'Clinique',
-    'Foyer',
-    'Autre',
+  final List<String> _typesEtablissementKeys = [
+    'ehpad',
+    'residence_seniors',
+    'hospital',
+    'clinic',
+    'foyer',
+    'other',
   ];
 
   // Couleur verte principale
@@ -49,6 +51,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -62,7 +65,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
         backgroundColor: Colors.white,
         body: Column(
           children: [
-          _buildHeader(),
+          _buildHeader(lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -98,7 +101,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                             
                             // Titre
                             Text(
-                              'Votre Établissement',
+                              lang.translate('your_establishment'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -111,7 +114,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                             
                             // Sous-titre
                             Text(
-                              'Informations de votre établissement',
+                              lang.translate('establishment_info_title'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -130,25 +133,27 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                   // Nom de l'établissement
                                   _buildTextField(
                                     controller: _nomEtablissementController,
-                                    label: 'Nom de l\'établissement *',
-                                    hint: 'EHPAD Les Jardins du Soleil',
+                                    label: lang.translate('establishment_name_label'),
+                                    hint: lang.translate('ehpad_sun_hint'),
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
                                   
                                   // Type d'établissement (Dropdown)
                                   _buildDropdownField(
-                                    label: 'Type d\'établissement *',
-                                    hint: 'Sélectionnez un type',
+                                    label: lang.translate('establishment_type_label'),
+                                    hint: lang.translate('select_type_hint'),
                                     value: _selectedTypeEtablissement,
-                                    items: _typesEtablissement,
+                                    items: _typesEtablissementKeys,
                                     onChanged: (value) {
                                       setState(() {
                                         _selectedTypeEtablissement = value;
                                       });
                                     },
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -156,9 +161,10 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                   // Adresse complète
                                   _buildTextField(
                                     controller: _adresseController,
-                                    label: 'Adresse complète *',
-                                    hint: '45 Avenue de la République',
+                                    label: lang.translate('full_address_label'),
+                                    hint: lang.translate('address_hint'),
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -171,10 +177,11 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                         flex: 4,
                                         child: _buildTextField(
                                           controller: _codePostalController,
-                                          label: 'Code postal *',
-                                          hint: '75001',
+                                          label: lang.translate('postal_code_label'),
+                                          hint: lang.translate('postal_code_hint'),
                                           keyboardType: TextInputType.number,
                                           isIPad: isIPad,
+                                          lang: lang,
                                         ),
                                       ),
                                       SizedBox(width: 16.w),
@@ -182,9 +189,10 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                         flex: 5,
                                         child: _buildTextField(
                                           controller: _villeController,
-                                          label: 'Ville *',
-                                          hint: 'Paris',
+                                          label: lang.translate('city_label'),
+                                          hint: lang.translate('city_hint'),
                                           isIPad: isIPad,
+                                          lang: lang,
                                         ),
                                       ),
                                     ],
@@ -195,11 +203,12 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                   // Téléphone
                                   _buildTextField(
                                     controller: _telephoneController,
-                                    label: 'Téléphone *',
-                                    hint: '06 12 34 56 78',
+                                    label: lang.translate('phone_label'),
+                                    hint: lang.translate('phone_hint'),
                                     icon: Icons.phone_outlined,
                                     keyboardType: TextInputType.phone,
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -207,16 +216,17 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                   // Capacité
                                   _buildTextField(
                                     controller: _capaciteController,
-                                    label: 'Capacité *',
-                                    hint: '120',
+                                    label: lang.translate('capacity_label'),
+                                    hint: lang.translate('capacity_hint'),
                                     keyboardType: TextInputType.number,
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 24.h),
                                   
                                   // Info box
-                                  _buildInfoBox(isIPad),
+                                  _buildInfoBox(isIPad, lang),
                                 ],
                               ),
                             ),
@@ -249,7 +259,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                                       'adresse': _adresseController.text,
                                       'codePostal': _codePostalController.text,
                                       'ville': _villeController.text,
-                                      'telephone': _telephoneController.text,
+                                      'telephoneEtablissement': _telephoneController.text,
                                       'capacite': _capaciteController.text,
                                     },
                                   ),
@@ -258,7 +268,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                             } else if (_selectedTypeEtablissement == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Veuillez sélectionner un type d\'établissement'),
+                                  content: Text(lang.translate('select_type_err')),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -277,7 +287,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -303,7 +313,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
   );
 }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -346,7 +356,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -356,9 +366,9 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                             ],
                           ),
                         ),
-                        // Étape 1/5 à droite
+                        // Étape 1/4 à droite
                         Text(
-                          'Étape 1/5',
+                          '${lang.translate('step')} 1/4',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -387,7 +397,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                           ),
                           FractionallySizedBox(
                             alignment: Alignment.centerLeft,
-                            widthFactor: 0.2,
+                            widthFactor: 0.25,
                             child: Container(
                               height: 4.h,
                               decoration: BoxDecoration(
@@ -416,6 +426,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
     IconData? icon,
     TextInputType? keyboardType,
     required bool isIPad,
+    required LanguageProvider lang,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,7 +472,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
             return null;
           },
@@ -477,9 +488,10 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
     required List<String> items,
     required Function(String?) onChanged,
     required bool isIPad,
+    required LanguageProvider lang,
   }) {
     // Créer la liste avec l'option de sélection en premier
-    final List<String> allItems = ['Sélectionnez votre fonction', ...items];
+    final List<String> allItems = ['select_type_option', ...items];
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,7 +534,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
           selectedItemBuilder: (BuildContext context) {
             return allItems.map<Widget>((String item) {
               return Text(
-                item == 'Sélectionnez votre fonction' ? '' : item,
+                item == 'select_type_option' ? '' : lang.translate(item),
                 style: getSourceSerifProStyle(
                   fontSize: 14.sp,
                   color: Colors.black87,
@@ -531,7 +543,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
             }).toList();
           },
           items: allItems.map((String item) {
-            final bool isSelectOption = item == 'Sélectionnez votre fonction';
+            final bool isSelectOption = item == 'select_type_option';
             final bool isSelected = value == item;
             
             return DropdownMenuItem<String>(
@@ -554,7 +566,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
                       SizedBox(width: 8.w),
                     ],
                     Text(
-                      item,
+                      lang.translate(item),
                       style: getSourceSerifProStyle(
                         fontSize: 14.sp,
                         color: isSelectOption ? Colors.white : Colors.white,
@@ -578,7 +590,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
           icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey[600]),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
             return null;
           },
@@ -587,7 +599,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
     );
   }
 
-  Widget _buildInfoBox(bool isIPad) {
+  Widget _buildInfoBox(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -610,7 +622,7 @@ class _InscriptionClientStep1ScreenState extends State<InscriptionClientStep1Scr
           SizedBox(width: 12.w),
           Expanded(
             child: Text(
-              'Ces informations seront visibles par les professionnels de santé',
+              lang.translate('info_visible_pros'),
               style: getSourceSerifProStyle(
                 fontSize: 13.sp,
                 color: _primaryGreen,

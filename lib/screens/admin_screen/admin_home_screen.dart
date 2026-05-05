@@ -2,15 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import '../../utils/font_helper.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../services/mission_service.dart';
+import '../../services/incident_service.dart';
+import '../../services/retour_service.dart';
+import '../../models/mission_model.dart';
+import 'admin_incidents_screen.dart';
+import 'admin_create_formation_screen.dart';
+import 'admin_profil_screen.dart';
+import 'admin_chat_list_screen.dart';
 import 'admin_missions_screen.dart';
+import 'admin_equipe_screen.dart';
+import 'admin_settings_screen.dart';
 import 'admin_create_mission_screen.dart';
 import 'admin_mission_detail_screen.dart';
 import 'admin_edit_mission_screen.dart';
-import 'admin_equipe_screen.dart';
-import 'admin_settings_screen.dart';
-import 'admin_profil_screen.dart';
+import 'admin_mission_chat_screen.dart';
+
+
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({Key? key}) : super(key: key);
@@ -19,7 +34,7 @@ class AdminHomeScreen extends StatefulWidget {
   _AdminHomeScreenState createState() => _AdminHomeScreenState();
 }
 
-class _AdminHomeScreenState extends State<AdminHomeScreen> {
+class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   
   // Couleurs
@@ -31,38 +46,157 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final Color _redStatus = Color(0xFFF44336);
   final Color _blueStatus = Color(0xFF2196F3);
   
-  // Liste de toutes les missions (mutable)
-  List<Map<String, dynamic>> _allMissions = [
-    {
-      'establishment': 'EHPAD Les Jardins',
-      'address': '12 Rue de la Santé, Paris',
-      'professional': 'Jean Dupont',
-      'status': 'En cours',
-      'schedule': '7h30 - 16h00',
-      'date': '17 Nov 2025',
-    },
-    {
-      'establishment': 'EHPAD Les Jardins',
-      'address': '12 Rue de la Santé, Paris',
-      'professional': 'Marie Leroy',
-      'status': 'Réfusé',
-      'schedule': '8h00 - 17h00',
-      'date': '18 Nov 2025',
-    },
-    {
-      'establishment': 'EHPAD Les Jardins',
-      'address': '12 Rue de la Santé, Paris',
-      'professional': 'Pierre Bernard',
-      'status': 'Confirmée',
-      'schedule': '9h00 - 18h00',
-      'date': '19 Nov 2025',
-    },
-  ];
+  // Service et données réelles
+  final MissionService _missionService = MissionService();
+  Map<String, dynamic> _stats = {};
+  bool _isStatsLoading = true;
+  Map<String, dynamic>? _lastIncident;
+  Map<String, dynamic>? _lastFeedback;
+  bool _alertsLoading = false;
+  AppLifecycleState? _lastLifecycleState;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadData();
+    // Polling toutes les 15s pour les nouveaux messages
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MissionProvider>(context, listen: false).startPolling();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    Provider.of<MissionProvider>(context, listen: false).stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _lastLifecycleState != AppLifecycleState.resumed) {
+      // L'app reprend du premier plan, recharger les données
+      _loadStats();
+      Provider.of<MissionProvider>(context, listen: false).fetchMissions();
+    }
+    _lastLifecycleState = state;
+  }
+
+  Future<void> _loadData() async {
+    // Charger missions, stats et alertes en parallèle pour aller plus vite
+    await Future.wait([
+      Provider.of<MissionProvider>(context, listen: false).fetchMissions(),
+      _loadStats(),
+      _loadLatestAlerts(),
+    ]);
+  }
+
+  Future<void> _loadStats() async {
+    setState(() => _isStatsLoading = true);
+    try {
+      final stats = await _missionService.getAdminStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isStatsLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Erreur stats: $e');
+      setState(() => _isStatsLoading = false);
+    }
+  }
+
+  Future<void> _loadLatestAlerts() async {
+    setState(() => _alertsLoading = true);
+    try {
+      final missions = Provider.of<MissionProvider>(context, listen: false).missions;
+      
+      // Essayer d'abord les nouvelles routes dédiées
+      try {
+        final results = await Future.wait([
+          IncidentService().getIncidents(),
+          RetourService().getRetours(),
+        ]);
+
+        final incidents = results[0];
+        final retours = results[1];
+
+        if (incidents.isNotEmpty || retours.isNotEmpty) {
+          incidents.sort((a, b) {
+            final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+            final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+            return bDate.compareTo(aDate);
+          });
+          retours.sort((a, b) {
+            final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+            final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+            return bDate.compareTo(aDate);
+          });
+
+          if (mounted) {
+            setState(() {
+              _lastIncident = incidents.isNotEmpty ? incidents.first : null;
+              _lastFeedback = retours.isNotEmpty ? retours.first : null;
+              _alertsLoading = false;
+            });
+          }
+          return;
+        }
+      } catch (_) {
+        // Fallback : charger depuis les messages de chat
+      }
+
+      // Fallback : ancienne méthode via messages de chat
+      final List<Map<String, dynamic>> allMessages = [];
+      await Future.wait(missions.map((mission) async {
+        try {
+          final messages = await _missionService.getChatMessages(mission.id);
+          for (final msg in messages) {
+            allMessages.add({
+              ...msg,
+              '_mission_name': mission.structureName ?? 'Mission inconnue',
+              '_mission_id': mission.id,
+            });
+          }
+        } catch (_) {}
+      }));
+
+      final incidentMessages = allMessages.where((msg) => msg['type'] == 'incident').toList();
+      final feedbackMessages = allMessages.where((msg) => msg['type'] == 'feedback').toList();
+
+      incidentMessages.sort((a, b) {
+        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+      feedbackMessages.sort((a, b) {
+        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+
+      if (mounted) {
+        setState(() {
+          _lastIncident = incidentMessages.isNotEmpty ? incidentMessages.first : null;
+          _lastFeedback = feedbackMessages.isNotEmpty ? feedbackMessages.first : null;
+          _alertsLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('AdminHomeScreen: erreur chargement des alertes -> $e');
+      if (mounted) setState(() => _alertsLoading = false);
+    }
+  }
+
+  // Suppression de _loadMissions car géré par le provider
 
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
     final langProvider = Provider.of<LanguageProvider>(context);
+    final missionProvider = Provider.of<MissionProvider>(context);
     
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -75,11 +209,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         body: Column(
           children: [
             // Header violet
-            _buildHeader(langProvider),
+            _buildHeader(langProvider, missionProvider),
             // Contenu scrollable
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await Future.wait([
+                    missionProvider.fetchMissions(),
+                    Provider.of<NotificationProvider>(context, listen: false).fetchNotifications(),
+                    _loadStats(),
+                    _loadLatestAlerts(),
+                  ]);
+                },
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -97,7 +240,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
             ),
-            // Navigation en bas
+          ),
+          // Navigation en bas
             _buildBottomNav(langProvider),
           ],
         ),
@@ -105,7 +249,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  Widget _buildHeader(LanguageProvider langProvider) {
+  Widget _buildHeader(LanguageProvider langProvider, MissionProvider missionProvider) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userName = authProvider.user?.fullName ?? 'Admin';
+
     return Container(
       decoration: BoxDecoration(
         color: _primaryPurple,
@@ -114,22 +261,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           bottomRight: Radius.circular(24),
         ),
       ),
-      padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 20.h),
+      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 20.h),
       child: Column(
         children: [
-          // Trait horizontal en haut
           Padding(
             padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top > 0 ? 8.h : 32.h,
+              top: MediaQuery.of(context).padding.top + 40.h,
               left: 12.w,
               right: 12.w,
             ),
             child: Container(
               height: 1,
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withOpacity(0.15),
             ),
           ),
-          SizedBox(height: 16.h),
+          SizedBox(height: 24.h),
           // Profil et notifications
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -139,17 +285,39 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 50.w,
-                    height: 50.w,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.person_outline,
-                      color: Colors.grey[600],
-                      size: 28.sp,
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminProfilScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: 50.w,
+                      height: 50.w,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: authProvider.user?.photoProfil != null
+                              ? Image.network(
+                                  authProvider.user!.photoProfil!,
+                                  width: 50.w,
+                                  height: 50.w,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    Icons.person_outline,
+                                    color: Colors.grey[600],
+                                    size: 28.sp,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person_outline,
+                                  color: Colors.grey[600],
+                                  size: 28.sp,
+                                ),
+                        ),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -166,7 +334,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       ),
                       SizedBox(height: 1.h),
                       Text(
-                        'Sophie Martin',
+                        userName,
                         style: getSourceSerifProStyle(
                           fontSize: 18.sp,
                           fontWeight: FontWeight.bold,
@@ -177,37 +345,107 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ],
               ),
-              // Notifications
-              Stack(
-                clipBehavior: Clip.none,
+              Row(
                 children: [
-                  Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white,
-                    size: 28.sp,
-                  ),
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 16.w,
-                      height: 16.w,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _primaryPurple, width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '2',
-                          style: getSourceSerifProStyle(
-                            fontSize: 9.sp,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  // Notifications
+                  Consumer2<NotificationProvider, MissionProvider>(
+                    builder: (context, notifProvider, missionProvider, child) {
+                      // Badge cloche = messages non lus + nouvelles missions non vues
+                      final totalUnread = missionProvider.totalUnreadMessagesCount +
+                          missionProvider.newMissionsCount;
+                      
+                      return GestureDetector(
+                        onTap: null, // La cloche n'ouvre plus de page
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white,
+                              size: 28.sp,
+                            ),
+                            if (totalUnread > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: _primaryPurple, width: 1.5),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 16.w,
+                                    minHeight: 16.w,
+                                  ),
+                                  child: Text(
+                                    totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 16.w),
+                  // Chat
+                  Consumer<MissionProvider>(
+                    builder: (context, missionProvider, child) {
+                      final chatUnread = missionProvider.totalUnreadMessagesCount;
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminChatListScreen()),
+                          );
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.white,
+                              size: 26.sp,
+                            ),
+                            if (chatUnread > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: _primaryPurple, width: 1.5),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 16.w,
+                                    minHeight: 16.w,
+                                  ),
+                                  child: Text(
+                                    chatUnread > 9 ? '9+' : chatUnread.toString(),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -218,11 +456,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStatCard('8', langProvider.translate('mission_today')),
+              Expanded(child: _buildStatCard(_stats['missions_today']?.toString() ?? '0', langProvider.translate('mission_today'))),
               SizedBox(width: 8.w),
-              _buildStatCard('24', langProvider.translate('available_professionals')),
+              Expanded(child: _buildStatCard(_stats['available_professionals']?.toString() ?? '0', langProvider.translate('available_professionals'))),
               SizedBox(width: 8.w),
-              _buildStatCard('12', langProvider.translate('active_sites')),
+              Expanded(child: _buildStatCard(_stats['active_sites']?.toString() ?? '0', langProvider.translate('active_sites'))),
             ],
           ),
         ],
@@ -232,9 +470,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Widget _buildStatCard(String value, String label) {
   return Container(
-    width: 104.w,
-    height: 94.w, // Hauteur légèrement augmentée pour éviter l'overflow
-    padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 6.h), // Padding réduit
+    height: 94.w,
+    padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 6.h),
     decoration: BoxDecoration(
       color: _statCardPurple,
       borderRadius: BorderRadius.circular(12),
@@ -274,23 +511,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         Expanded(
           child: ElevatedButton(
             onPressed: () async {
-              final result = await Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => AdminCreateMissionScreen(
-                    onMissionCreated: (newMission) {
-                      setState(() {
-                        _allMissions.insert(0, newMission);
-                      });
-                    },
+                    onMissionCreated: (newMission) {},
                   ),
                 ),
               );
-              if (result != null) {
-                setState(() {
-                  _allMissions.insert(0, result);
-                });
-              }
+              await Future.wait([
+                _loadStats(),
+                Provider.of<MissionProvider>(context, listen: false).fetchMissions(),
+                _loadLatestAlerts(),
+              ]);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryPurple,
@@ -307,14 +540,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               children: [
                 Icon(Icons.add, size: 32.sp, color: Colors.white),
                 SizedBox(height: 8.h),
-                Text(
-                  langProvider.translate('create_mission'),
-                  style: getSourceSerifProStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+                Flexible(
+                   child: Text(
+                     langProvider.translate('create_mission'),
+                     style: getSourceSerifProStyle(
+                       fontSize: 11.sp,
+                       fontWeight: FontWeight.w600,
+                       color: Colors.white,
+                     ),
+                     textAlign: TextAlign.center,
+                     maxLines: 2,
+                     overflow: TextOverflow.ellipsis,
+                   ),
+                 ),
               ],
             ),
           ),
@@ -322,8 +560,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         SizedBox(width: 12.w),
         Expanded(
           child: ElevatedButton(
-            onPressed: () {
-              // TODO: Créer formation
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminCreateFormationScreen(),
+                ),
+              );
+              if (result == true) {
+                // Si une formation a été créée, on peut rafraîchir les stats
+                _loadStats();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryBlue,
@@ -340,12 +587,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               children: [
                 Icon(Icons.menu_book_outlined, size: 32.sp, color: Colors.white),
                 SizedBox(height: 8.h),
-                Text(
-                  langProvider.translate('create_training'),
-                  style: getSourceSerifProStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                Flexible(
+                  child: Text(
+                    langProvider.translate('create_training'),
+                    style: getSourceSerifProStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -357,6 +609,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _buildMissionsSection(LanguageProvider langProvider) {
+    final missionProvider = Provider.of<MissionProvider>(context);
+    final missions = missionProvider.missions;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -373,7 +628,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             GestureDetector(
               onTap: () {
-                _showAllMissions(langProvider);
+                _showAllMissions(langProvider, missionProvider);
               },
               child: Text(
                 langProvider.translate('see_all'),
@@ -386,42 +641,103 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ],
         ),
         SizedBox(height: 12.h),
-        ..._allMissions.take(3).map((mission) => Padding(
-          padding: EdgeInsets.only(bottom: 12.h),
-          child: _buildMissionCard(
-            mission['establishment'] ?? '',
-            mission['professional'] ?? '',
-            mission['status'] ?? '',
-            mission,
-            langProvider,
-          ),
-        )).toList(),
+        if (missionProvider.isLoading && missions.isEmpty)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.h),
+              child: CircularProgressIndicator(color: _primaryPurple),
+            ),
+          )
+        else if (missionProvider.error != null)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.h),
+              child: Column(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red, size: 32.sp),
+                  SizedBox(height: 8.h),
+                  Text(
+                    langProvider.translate('error_loading'),
+                    style: getSourceSerifProStyle(fontSize: 14.sp, color: Colors.red),
+                  ),
+                  SizedBox(height: 8.h),
+                  TextButton(
+                    onPressed: missionProvider.fetchMissions,
+                    child: Text(langProvider.translate('retry')),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (missions.isEmpty)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.h),
+              child: Text(
+                langProvider.translate('no_mission_yet'),
+                style: getSourceSerifProStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              ),
+            ),
+          )
+        else
+          ...missions.take(3).map((mission) {
+            final professionnelName = (mission.professionnelNom ?? '').trim();
+            final missionMap = {
+              'id': mission.id,
+              'establishment': mission.structureName ?? langProvider.translate('not_defined'),
+              'professional': professionnelName.isNotEmpty ? professionnelName : langProvider.translate('not_assigned'),
+              'status': mission.status,
+              'schedule': mission.horaireMission != null
+                  ? '${DateFormat('HH:mm').format(mission.horaireMission!)}${mission.heureFin != null ? ' - ${mission.heureFin}' : ''}'
+                  : '',
+              'date': mission.horaireMission != null
+                  ? DateFormat('dd/MM/yyyy').format(mission.horaireMission!)
+                  : DateFormat('dd/MM/yyyy').format(mission.createdAt),
+            };
+            return Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: _buildMissionCard(
+                missionMap['establishment'] as String,
+                missionMap['professional'] as String,
+                missionMap['status'] as String,
+                missionMap,
+                langProvider,
+                missionModel: mission,
+              ),
+            );
+          }).toList(),
       ],
     );
   }
 
-  Widget _buildMissionCard(String title, String professional, String status, Map<String, dynamic>? missionData, LanguageProvider langProvider) {
+  Widget _buildMissionCard(String title, String professional, String status, Map<String, dynamic>? missionData, LanguageProvider langProvider, {MissionModel? missionModel}) {
     final mission = missionData ?? {
       'establishment': title,
       'professional': professional,
       'status': status,
     };
-    // Déterminer les couleurs selon le statut
-    Color statusBgColor;
-    Color statusTextColor;
-    
-    if (status == 'En cours') {
-      statusBgColor = Color(0xFFE2FBE9);
-      statusTextColor = Color(0xFF009814);
-    } else if (status == 'Réfusé') {
-      statusBgColor = Color(0xFFFAE3E3);
-      statusTextColor = Color(0xFFFF0000);
-    } else if (status == 'Confirmée') {
-      statusBgColor = Color(0xFFDEEAFC);
-      statusTextColor = Color(0xFF0059AB);
+    final String missionStatus = missionModel?.status ?? status;
+    final bool isTerminee = missionStatus == 'terminé';
+    final bool isAssigned = professional.trim().isNotEmpty && 
+                           professional != 'Thomas Martin' &&
+                           professional != 'Non assigné';
+
+    final Color statusBgColor;
+    final Color statusTextColor;
+    final String statusLabel;
+
+    if (isTerminee) {
+      statusBgColor = const Color(0xFFF3F4F6); // Gris clair
+      statusTextColor = const Color(0xFF6B7280); // Gris foncé
+      statusLabel = langProvider.translate('finished');
+    } else if (isAssigned) {
+      statusBgColor = const Color(0xFFE8F5E9); // Vert clair
+      statusTextColor = const Color(0xFF4CAF50); // Vert
+      statusLabel = langProvider.translate('in_progress');
     } else {
-      statusBgColor = Colors.grey[200]!;
-      statusTextColor = Colors.grey[700]!;
+      statusBgColor = const Color(0xFFE3F2FD); // Bleu clair
+      statusTextColor = const Color(0xFF0059AB); // Bleu
+      statusLabel = langProvider.translate('planned');
     }
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -453,22 +769,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
               Container(
-                constraints: BoxConstraints(
-                  minWidth: 80.w, // Largeur minimale uniforme
-                ),
                 padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: statusBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  status,
-                  style: getSourceSerifProStyle(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                    color: statusTextColor,
-                  ),
-                  textAlign: TextAlign.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isAssigned ? Icons.access_time : Icons.calendar_today,
+                      size: 11.sp,
+                      color: statusTextColor,
+                    ),
+                    SizedBox(width: 4.w),
+                    Text(
+                      statusLabel,
+                      style: getSourceSerifProStyle(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                        color: statusTextColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -477,14 +801,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Row(
             children: [
               Icon(
-                Icons.location_on,
-                color: Colors.grey[600],
+                Icons.person_outline,
+                color: _primaryPurple,
                 size: 16.sp,
               ),
               SizedBox(width: 4.w),
               Expanded(
                 child: Text(
-                  mission['address'] ?? '',
+                  mission['professional'] ?? langProvider.translate('not_assigned'),
                   style: getSourceSerifProStyle(
                     fontSize: 12.sp,
                     color: Colors.grey[600],
@@ -493,31 +817,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ],
           ),
+          SizedBox(height: 12.h),
+          // _buildCompactMenuBlock(missionModel ?? MissionModel.fromJson(missionData ?? {}), langProvider),
           SizedBox(height: 16.h),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    // Marquer la mission comme vue → badge disparaît
+                    Provider.of<MissionProvider>(context, listen: false)
+                        .markMissionAsViewed(missionModel?.id ?? 0);
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => AdminMissionDetailScreen(
-                          mission: mission,
+                          mission: missionModel ?? MissionModel.fromJson(missionData ?? {}),
                           onMissionUpdated: (updatedMission) {
-                            setState(() {
-                              final index = _allMissions.indexWhere((m) => 
-                                m['establishment'] == mission['establishment'] &&
-                                m['professional'] == mission['professional']
-                              );
-                              if (index != -1) {
-                                _allMissions[index] = updatedMission;
-                              }
-                            });
+                            Provider.of<MissionProvider>(context, listen: false).fetchMissions();
                           },
                         ),
                       ),
                     );
+                    _loadStats();
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Color(0xFFF9F6FE),
@@ -552,26 +874,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               SizedBox(width: 8.w),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    // Marquer la mission comme vue → badge disparaît
+                    Provider.of<MissionProvider>(context, listen: false)
+                        .markMissionAsViewed(mission['id'] as int? ?? 0);
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => AdminEditMissionScreen(
                           mission: mission,
                           onMissionUpdated: (updatedMission) {
-                            setState(() {
-                              final index = _allMissions.indexWhere((m) => 
-                                m['establishment'] == mission['establishment'] &&
-                                m['professional'] == mission['professional']
-                              );
-                              if (index != -1) {
-                                _allMissions[index] = updatedMission;
-                              }
-                            });
+                            Provider.of<MissionProvider>(context, listen: false).fetchMissions();
                           },
                         ),
                       ),
                     );
+                    _loadStats();
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Color(0xFFF9F6FE),
@@ -603,6 +921,79 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ),
               ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () {
+                        if (missionModel != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AdminMissionChatScreen(mission: missionModel),
+                            ),
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE0F2F1),
+                        foregroundColor: const Color(0xFF00796B),
+                        padding: EdgeInsets.symmetric(vertical: 10.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        side: BorderSide.none,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 16.sp,
+                            color: const Color(0xFF00796B),
+                          ),
+                          SizedBox(width: 6.w),
+                          Text(
+                            langProvider.translate('chat'),
+                            style: getSourceSerifProStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF00796B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if ((missionModel?.unreadMessagesCount ?? 0) > 0)
+                      Positioned(
+                        top: -6,
+                        right: -6,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                          ),
+                          constraints: BoxConstraints(minWidth: 18.w, minHeight: 18.w),
+                          child: Center(
+                            child: Text(
+                              (missionModel!.unreadMessagesCount) > 99
+                                  ? '99+'
+                                  : missionModel.unreadMessagesCount.toString(),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -610,8 +1001,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  void _showAllMissions(LanguageProvider langProvider) {
-    if (_allMissions.isEmpty) {
+  void _showAllMissions(LanguageProvider langProvider, MissionProvider missionProvider) {
+    if (missionProvider.missions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(langProvider.translate('no_mission_available')),
@@ -676,17 +1067,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Expanded(
                 child: ListView.builder(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  itemCount: _allMissions.length,
+                  itemCount: missionProvider.missions.length,
                   itemBuilder: (context, index) {
-                    final mission = _allMissions[index];
+                    final mission = missionProvider.missions[index];
+                    final professionnelName = (mission.professionnelNom ?? '').trim();
+                    final missionMap = {
+                      'id': mission.id,
+                      'establishment': mission.structureName ?? 'Structure inconnue',
+                      'professional': professionnelName.isNotEmpty ? professionnelName : 'Non assigné',
+                      'status': mission.status,
+                      'schedule': mission.horaireMission != null
+                          ? '${DateFormat('HH:mm').format(mission.horaireMission!)}${mission.heureFin != null ? ' - ${mission.heureFin}' : ''}'
+                          : '',
+                      'date': mission.horaireMission != null
+                          ? DateFormat('dd/MM/yyyy').format(mission.horaireMission!)
+                          : DateFormat('dd/MM/yyyy').format(mission.createdAt),
+                      'nb_residents': mission.nbResidentsJour,
+                      'types_repas': mission.typesRepas,
+                      'regimes_speciaux': mission.regimesSpeciaux,
+                    };
                     return Padding(
                       padding: EdgeInsets.only(bottom: 12.h),
                       child: _buildMissionCard(
-                        mission['establishment'] ?? '',
-                        mission['professional'] ?? '',
-                        mission['status'] ?? '',
-                        mission,
+                        missionMap['establishment'] as String,
+                        missionMap['professional'] as String,
+                        missionMap['status'] as String,
+                        missionMap,
                         langProvider,
+                        missionModel: mission,
                       ),
                     );
                   },
@@ -700,46 +1108,210 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _buildAlertsSection(LanguageProvider langProvider) {
+    // Afficher un skeleton pendant le chargement
+    if (_alertsLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                langProvider.translate('recent_alerts'),
+                style: getSourceSerifProStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          // Skeleton card incident
+          _buildSkeletonCard(),
+          SizedBox(height: 12.h),
+          // Skeleton card feedback
+          _buildSkeletonCard(),
+        ],
+      );
+    }
+
+    final incidentText = _getAlertPreview(_lastIncident, true);
+    final feedbackText = _getAlertPreview(_lastFeedback, false);
+    final incidentMeta = _getAlertMeta(_lastIncident);
+    final feedbackMeta = _getAlertMeta(_lastFeedback);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          langProvider.translate('recent_alerts'),
-          style: getSourceSerifProStyle(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              langProvider.translate('recent_alerts'),
+              style: getSourceSerifProStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminIncidentsScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: _primaryPurple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'Voir tout',
+                      style: getSourceSerifProStyle(
+                        fontSize: 13.sp,
+                        color: _primaryPurple,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(width: 4.w),
+                    Icon(Icons.chevron_right, size: 16.sp, color: _primaryPurple),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminIncidentsScreen(),
+              ),
+            );
+          },
+          child: _buildAlertCard(
+            Icons.warning_amber_rounded,
+            Color(0xFFFFEBEE),
+            Color(0xFFEF5350),
+            incidentText,
+            incidentMeta.isNotEmpty ? incidentMeta : 'Voir tous les incidents',
+            showArrow: true,
           ),
         ),
         SizedBox(height: 12.h),
-        _buildAlertCard(
-          Icons.warning_amber_rounded,
-          Color(0xFFFFEBEE), // Light red background
-          Color(0xFFEF5350), // Red icon
-          langProvider.translate('incident_reported') + ' - EHPAD Les Jardins',
-          '10:30',
-        ),
-        SizedBox(height: 12.h),
-        _buildAlertCard(
-          Icons.notifications_outlined,
-          Color(0xFFE3F2FD), // Light blue background
-          Color(0xFF2196F3), // Blue icon
-          langProvider.translate('new_note') + ' de Jean Dupont',
-          '09:15',
-        ),
-        SizedBox(height: 12.h),
-        _buildAlertCard(
-          Icons.menu_book_outlined,
-          Color(0xFFFFF3E0), // Light orange background
-          Color(0xFFFF9800), // Orange icon
-          '3 ' + langProvider.translate('trainings_to_validate'),
-          'Hier', // TODO: Traduire date
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminIncidentsScreen(),
+              ),
+            );
+          },
+          child: _buildAlertCard(
+            Icons.star_rounded,
+            Color(0xFFFFF8E1),
+            Color(0xFFFFB300),
+            feedbackText,
+            feedbackMeta.isNotEmpty ? feedbackMeta : 'Voir tous les avis',
+            showArrow: true,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildAlertCard(IconData icon, Color iconBg, Color iconColor, String text, String time) {
+  String _getAlertPreview(Map<String, dynamic>? msg, bool isIncident) {
+    if (msg == null) {
+      return isIncident ? 'Aucun incident récent' : 'Aucun retour récent';
+    }
+
+    final content = msg['content']?.toString() ?? '';
+    final cleanContent = content
+        .replaceAll(RegExp(r'^🚨 INCIDENT: \[[^\]]+\]\s*'), '')
+        .replaceAll(RegExp(r'^⭐ FEEDBACK: \[Note: \d+\.?\d*/5\]\s*'), '')
+        .trim();
+
+    if (cleanContent.isEmpty) {
+      return isIncident ? 'Incident sans description' : 'Retour sans description';
+    }
+
+    return cleanContent.length > 80
+        ? '${cleanContent.substring(0, 80)}...'
+        : cleanContent;
+  }
+
+  String _getAlertMeta(Map<String, dynamic>? msg) {
+    if (msg == null) return '';
+    final missionName = msg['_mission_name']?.toString() ?? '';
+    final createdAt = msg['created_at'] != null
+        ? DateTime.tryParse(msg['created_at'].toString())
+        : null;
+    final date = createdAt != null
+        ? DateFormat('dd/MM HH:mm').format(createdAt)
+        : '';
+
+    return [if (missionName.isNotEmpty) missionName, if (date.isNotEmpty) date]
+        .join(' • ');
+  }
+
+  Widget _buildSkeletonCard() {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40.w,
+            height: 40.h,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 12.h,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Container(
+                  height: 10.h,
+                  width: 120.w,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertCard(IconData icon, Color iconBg, Color iconColor, String text, String time, {bool showArrow = false}) {
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -798,6 +1370,153 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ],
             ),
           ),
+          if (showArrow)
+            Icon(Icons.chevron_right, color: Colors.grey[400], size: 20.sp),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissionDetailItem(IconData icon, String label, String value) {
+    final bool isDate = label.toLowerCase().contains('date');
+    final bool isProfessional = label.toLowerCase().contains('professionnel');
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey[400], size: 18.sp),
+        SizedBox(width: 10.w),
+        Text(
+          label,
+          style: getSourceSerifProStyle(
+            fontSize: 13.sp,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (isProfessional)
+          Expanded(
+            child: Text(
+              value,
+              style: getInterStyle(
+                fontSize: 13.sp,
+                color: Colors.black.withOpacity(0.8),
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        else
+          Text(
+            value,
+            style: isDate
+            ? getInterStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black.withOpacity(0.8),
+                height: 1.0,
+              )
+            : getSourceSerifProStyle(
+                fontSize: 13.sp,
+                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactMenuBlock(MissionModel mission, LanguageProvider langProvider) {
+    final mainRepas = mission.getMainRepas();
+    final bool hasMenu = mainRepas != null;
+    
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'MENU',
+                style: getSourceSerifProStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+              if (hasMenu)
+                Text(
+                  langProvider.translate(mainRepas!.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9.sp,
+                    fontWeight: FontWeight.bold,
+                    color: _primaryPurple.withOpacity(0.6),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          if (!hasMenu)
+            Text(
+              langProvider.translate('menu_not_communicated') == 'menu_not_communicated' ? 'Menu non communiqué' : langProvider.translate('menu_not_communicated'),
+              style: TextStyle(
+                fontSize: 13.sp, 
+                color: Colors.grey[400], 
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            _buildMenuRowsForMeal(mainRepas!, langProvider),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuRowsForMeal(RepasModel repas, LanguageProvider langProvider) {
+    return Column(
+      children: [
+        _buildSimplifiedMenuRow(langProvider.translate('starter_label'), repas.getDisplayName('entree')),
+        _buildSimplifiedMenuRow(langProvider.translate('dish_label'), repas.getDisplayName('plat')),
+        _buildSimplifiedMenuRow(langProvider.translate('side_label'), repas.getDisplayName('accompagnement')),
+        _buildSimplifiedMenuRow(langProvider.translate('dessert_label'), repas.getDisplayName('dessert')),
+      ],
+    );
+  }
+
+  Widget _buildSimplifiedMenuRow(String label, String value) {
+    if (value.isEmpty || value == '--') return const SizedBox.shrink();
+    
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label : ',
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF2D2D2D),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: const Color(0xFF666666),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -815,8 +1534,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home_rounded, Icons.home, langProvider.translate('home'), 0, langProvider),
-              _buildNavItem(Icons.card_giftcard_rounded, Icons.card_giftcard, langProvider.translate('missions'), 1, langProvider),
+              _buildNavItem(Icons.home_outlined, Icons.home, langProvider.translate('home'), 0, langProvider),
+              _buildNavItem(Icons.work_outline, Icons.work, langProvider.translate('missions'), 1, langProvider),
               _buildNavItem(Icons.people_outline, Icons.people, langProvider.translate('team'), 2, langProvider),
               _buildNavItem(Icons.settings_outlined, Icons.settings, langProvider.translate('admin_panel'), 3, langProvider),
               _buildNavItem(Icons.person_outline, Icons.person, langProvider.translate('profile'), 4, langProvider),

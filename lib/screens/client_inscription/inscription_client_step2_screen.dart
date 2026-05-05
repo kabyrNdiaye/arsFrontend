@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import 'inscription_client_step3_screen.dart';
 
 class InscriptionClientStep2Screen extends StatefulWidget {
@@ -20,6 +22,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
   final TextEditingController _prenomController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
+  final TextEditingController _fonctionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   // Couleur verte principale
@@ -44,9 +47,10 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
         });
       }
     } catch (e) {
+      final lang = Provider.of<LanguageProvider>(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors de la sélection de la photo'),
+          content: Text(lang.translate('photo_pick_error')),
           backgroundColor: Colors.red,
         ),
       );
@@ -59,12 +63,14 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
     _prenomController.dispose();
     _emailController.dispose();
     _telephoneController.dispose();
+    _fonctionController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -83,7 +89,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -119,7 +125,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                             
                             // Titre
                             Text(
-                              'Responsable',
+                              lang.translate('responsible_title'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -132,7 +138,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                             
                             // Sous-titre
                             Text(
-                              'Coordonnées du responsable principal',
+                              lang.translate('responsible_coords'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -144,7 +150,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                             SizedBox(height: isIPad ? 32.h : 24.h),
                             
                             // Card Responsable de l'établissement
-                            _buildResponsableCard(isIPad),
+                            _buildResponsableCard(isIPad, lang),
                             
                             SizedBox(height: isIPad ? 32.h : 24.h),
                             
@@ -156,9 +162,10 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                                   // Nom
                                   _buildTextField(
                                     controller: _nomController,
-                                    label: 'Nom *',
-                                    hint: 'Dubois',
+                                    label: lang.translate('Nom'),
+                                    hint: 'Jackop',
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -166,9 +173,10 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                                   // Prénom
                                   _buildTextField(
                                     controller: _prenomController,
-                                    label: 'Prénom *',
-                                    hint: 'Dubois',
+                                    label: lang.translate('Prenom'),
+                                    hint: 'Pierre',
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -176,24 +184,36 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                                   // Email professionnel
                                   _buildTextField(
                                     controller: _emailController,
-                                    label: 'Email professionnel *',
-                                    hint: 'm.dubois@etablissement.fr',
+                                    label: lang.translate('email_prof_label'),
+                                    hint: 'm.Pierre@etablissement.fr',
                                     icon: Icons.mail_outline,
                                     keyboardType: TextInputType.emailAddress,
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
                                   
-                                  // Téléphone
-                                  _buildTextField(
-                                    controller: _telephoneController,
-                                    label: 'Téléphone *',
-                                    hint: '06 12 34 56 78',
-                                    icon: Icons.phone_outlined,
-                                    keyboardType: TextInputType.phone,
-                                    isIPad: isIPad,
-                                  ),
+                                    _buildTextField(
+                                      controller: _telephoneController,
+                                      label: lang.translate('phone_label'),
+                                      hint: '06 12 34 56 78',
+                                      icon: Icons.phone_outlined,
+                                      keyboardType: TextInputType.phone,
+                                      isIPad: isIPad,
+                                      lang: lang,
+                                    ),
+
+                                    SizedBox(height: 20.h),
+
+                                    // Fonction
+                                    _buildTextField(
+                                      controller: _fonctionController,
+                                      label: lang.translate('function_label'),
+                                      hint: lang.translate('director_hint'),
+                                      isIPad: isIPad,
+                                      lang: lang,
+                                    ),
                                 ],
                               ),
                             ),
@@ -226,6 +246,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                                       'prenom': _prenomController.text,
                                       'email': _emailController.text,
                                       'telephone': _telephoneController.text,
+                                      'fonction': _fonctionController.text,
                                       'photoPath': _selectedPhotoPath,
                                       'photoBytes': _selectedPhotoBytes,
                                     },
@@ -247,7 +268,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -272,7 +293,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -315,7 +336,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -325,9 +346,9 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                             ],
                           ),
                         ),
-                        // Étape 2/5 à droite
+                        // Étape 2/4 à droite
                         Text(
-                          'Étape 2/5',
+                          '${lang.translate('step')} 2/4',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -358,7 +379,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
                           // Ligne de progression (40%)
                           FractionallySizedBox(
                             alignment: Alignment.centerLeft,
-                            widthFactor: 0.4,
+                            widthFactor: 0.5,
                             child: Container(
                               height: 4.h,
                               decoration: BoxDecoration(
@@ -380,7 +401,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
     );
   }
 
-  Widget _buildResponsableCard(bool isIPad) {
+  Widget _buildResponsableCard(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
@@ -409,7 +430,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
               ),
               SizedBox(width: 10.w),
               Text(
-                'Responsable de l\'établissement',
+                lang.translate('responsible_card_title'),
                 style: getSourceSerifProStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w600,
@@ -480,7 +501,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
           
           // Texte "Photo optionnelle"
           Text(
-            _selectedPhotoBytes != null ? 'Changer la photo' : 'Photo optionnelle',
+            _selectedPhotoBytes != null ? lang.translate('change_photo') : lang.translate('optional_photo'),
             style: getSourceSerifProStyle(
               fontSize: 12.sp,
               color: _primaryGreen,
@@ -499,6 +520,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
     IconData? icon,
     TextInputType? keyboardType,
     required bool isIPad,
+    required LanguageProvider lang,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,10 +566,10 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
-            if (label.contains('Email') && !value.contains('@')) {
-              return 'Veuillez entrer un email valide';
+            if (label.contains(lang.translate('email_prof_label').replaceAll(' *', '')) && !value.contains('@')) {
+              return lang.translate('invalid_email_err');
             }
             return null;
           },

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
-import 'inscription_client_step4_screen.dart';
+import '../../providers/language_provider.dart';
+import 'inscription_client_step5_screen.dart';
 
 class InscriptionClientStep3Screen extends StatefulWidget {
   final Map<String, dynamic>? previousData;
@@ -59,6 +61,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -77,7 +80,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -113,7 +116,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                             
                             // Titre
                             Text(
-                              'Compte l\'accès',
+                              lang.translate('account_access_title'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -126,7 +129,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                             
                             // Sous-titre
                             Text(
-                              'Créez votre compte sécurisé',
+                              lang.translate('secure_account_desc'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -144,15 +147,14 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Email de connexion
-                                  _buildEmailField(isIPad),
+                                  _buildEmailField(isIPad, lang),
                                   
                                   SizedBox(height: 20.h),
                                   
                                   // Mot de passe
                                   _buildPasswordField(
                                     controller: _passwordController,
-                                    label: 'Mot de passe *',
-                                    hint: '************',
+                                    hint: lang.translate('password'),
                                     obscure: _obscurePassword,
                                     onToggle: () {
                                       setState(() {
@@ -160,6 +162,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                                       });
                                     },
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 20.h),
@@ -167,8 +170,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                                   // Confirmer le mot de passe
                                   _buildPasswordField(
                                     controller: _confirmPasswordController,
-                                    label: 'Confirmer le mot de passe *',
-                                    hint: '************',
+                                    hint: lang.translate('confirm_password'),
                                     obscure: _obscureConfirmPassword,
                                     onToggle: () {
                                       setState(() {
@@ -177,12 +179,13 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                                     },
                                     isIPad: isIPad,
                                     isConfirm: true,
+                                    lang: lang,
                                   ),
                                   
                                   SizedBox(height: 24.h),
                                   
                                   // Box des exigences du mot de passe
-                                  _buildPasswordRequirementsBox(isIPad),
+                                  _buildPasswordRequirementsBox(isIPad, lang),
                                 ],
                               ),
                             ),
@@ -209,7 +212,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => InscriptionClientStep4Screen(
+                                  builder: (context) => InscriptionClientStep5Screen(
                                     previousData: {
                                       ...?widget.previousData,
                                       'emailConnexion': _emailController.text,
@@ -233,7 +236,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -258,7 +261,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -301,7 +304,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -311,9 +314,9 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                             ],
                           ),
                         ),
-                        // Étape 3/5 à droite
+                        // Étape 3/4 à droite
                         Text(
-                          'Étape 3/5',
+                          '${lang.translate('step')} 3/4',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -341,10 +344,10 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
                               borderRadius: BorderRadius.circular(2.h),
                             ),
                           ),
-                          // Ligne de progression (60%)
+                          // Ligne de progression (75%)
                           FractionallySizedBox(
                             alignment: Alignment.centerLeft,
-                            widthFactor: 0.6,
+                            widthFactor: 0.75,
                             child: Container(
                               height: 4.h,
                               decoration: BoxDecoration(
@@ -366,12 +369,12 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
     );
   }
 
-  Widget _buildEmailField(bool isIPad) {
+  Widget _buildEmailField(bool isIPad, LanguageProvider lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Email de connexion *',
+          lang.translate('email_login_label'),
           style: getSourceSerifProStyle(
             fontSize: 14.sp,
             color: Colors.black87,
@@ -411,10 +414,10 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
             if (!value.contains('@')) {
-              return 'Veuillez entrer un email valide';
+              return lang.translate('invalid_email_err');
             }
             return null;
           },
@@ -425,25 +428,16 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
 
   Widget _buildPasswordField({
     required TextEditingController controller,
-    required String label,
     required String hint,
     required bool obscure,
     required VoidCallback onToggle,
     required bool isIPad,
+    required LanguageProvider lang,
     bool isConfirm = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: getSourceSerifProStyle(
-            fontSize: 14.sp,
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 8.h),
         TextFormField(
           controller: controller,
           obscureText: obscure,
@@ -484,10 +478,10 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
             if (isConfirm && value != _passwordController.text) {
-              return 'Les mots de passe ne correspondent pas';
+              return lang.translate('passwords_mismatch');
             }
             return null;
           },
@@ -496,7 +490,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
     );
   }
 
-  Widget _buildPasswordRequirementsBox(bool isIPad) {
+  Widget _buildPasswordRequirementsBox(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -509,7 +503,7 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Votre mot de passe doit contenir :',
+            lang.translate('pw_must_contain'),
             style: getSourceSerifProStyle(
               fontSize: 13.sp,
               color: Colors.grey[700],
@@ -517,13 +511,13 @@ class _InscriptionClientStep3ScreenState extends State<InscriptionClientStep3Scr
             ),
           ),
           SizedBox(height: 12.h),
-          _buildRequirementItem('Au moins 8 caractères', _hasMinLength),
+          _buildRequirementItem(lang.translate('at_least_8_chars'), _hasMinLength),
           SizedBox(height: 8.h),
-          _buildRequirementItem('Une lettre majuscule', _hasUppercase),
+          _buildRequirementItem(lang.translate('one_uppercase'), _hasUppercase),
           SizedBox(height: 8.h),
-          _buildRequirementItem('Une lettre minuscule', _hasLowercase),
+          _buildRequirementItem(lang.translate('one_lowercase'), _hasLowercase),
           SizedBox(height: 8.h),
-          _buildRequirementItem('Un chiffre', _hasDigit),
+          _buildRequirementItem(lang.translate('one_digit'), _hasDigit),
         ],
       ),
     );

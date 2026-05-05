@@ -4,7 +4,7 @@ import '../../providers/language_provider.dart';
 import '../../utils/font_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'login_screen_2.dart';
-import '../authentification/inscription1_screen.dart';
+import '../client_inscription/inscription_client_step1_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -124,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         // Navigation vers la page Inscription1
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => Inscription1Screen()),
+                          MaterialPageRoute(builder: (context) => InscriptionClientStep1Screen()),
                         );
                       },
                     ),

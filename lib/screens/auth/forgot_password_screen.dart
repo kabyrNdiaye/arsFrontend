@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../providers/language_provider.dart';
 import '../../utils/font_helper.dart';
 import 'login_screen_2.dart';
+import 'reset_password_screen.dart';
+import '../../services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   @override
@@ -28,13 +30,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _isLoading = true;
       });
       
-      // Simuler l'envoi de l'email
-      await Future.delayed(Duration(seconds: 2));
+      final authService = AuthService();
+      final result = await authService.forgotPassword(_emailController.text.trim());
       
       setState(() {
         _isLoading = false;
-        _emailSent = true;
       });
+
+      if (result['success'] == true) {
+        setState(() {
+          _emailSent = true;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors de l\'envoi de l\'email'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -270,16 +284,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           if (_emailSent) ...[
                             SizedBox(height: 20.h),
                             
-                            // Bouton Retour à la connexion
+                             // Bouton Retour à la connexion
                             ConstrainedBox(
                               constraints: BoxConstraints(maxWidth: 400.w),
                               child: SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton(
                                   onPressed: () {
-                                    Navigator.pushReplacement(
+                                    Navigator.push(
                                       context,
-                                      MaterialPageRoute(builder: (context) => LoginScreen2()),
+                                      MaterialPageRoute(
+                                        builder: (context) => ResetPasswordScreen(
+                                          email: _emailController.text.trim(),
+                                        ),
+                                      ),
                                     );
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -292,11 +310,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                     elevation: 0,
                                   ),
                                   child: Text(
-                                    langProvider.translate('back_to_login'),
+                                    'Saisir le code',
                                     style: getSourceSerifProStyle(
                                       fontSize: 16.sp,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            SizedBox(height: 12.h),
+
+                            // Bouton Retour à la connexion
+                            ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: 400.w),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => LoginScreen2()),
+                                    );
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    side: BorderSide(color: Color(0xFF0059AB)),
+                                  ),
+                                  child: Text(
+                                    langProvider.translate('back_to_login'),
+                                    style: getSourceSerifProStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0059AB),
                                     ),
                                   ),
                                 ),

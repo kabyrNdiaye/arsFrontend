@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import '../auth/login_screen22.dart';
 import 'inscription_professionnel_step2_screen.dart';
 
@@ -73,9 +75,8 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
-    // Configurer la barre de statut pour qu'elle soit visible avec texte blanc
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Color(0xFF0059AB),
@@ -88,7 +89,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
         backgroundColor: Colors.white,
         body: Column(
           children: [
-          _buildHeader(),
+          _buildHeader(lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -127,7 +128,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: isIPad ? 24.h : 20.h),
                             Text(
-                              'Informations personnelles',
+                              lang.translate('personal_info'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -137,7 +138,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: 8.h),
                             Text(
-                              'Commencez par vous en dire plus sur vous',
+                              lang.translate('start_telling_us'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -150,40 +151,44 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                               key: _formKey,
                               child: Column(
                                 children: [
-                                  _buildTextField(
-                                    controller: _prenomController,
-                                    focusNode: _prenomFocus,
-                                    label: 'Prénom *',
-                                    hint: 'Prénom',
-                                    isIPad: isIPad,
-                                  ),
+                                    _buildTextField(
+                                      controller: _prenomController,
+                                      focusNode: _prenomFocus,
+                                      label: lang.translate('first_name'),
+                                      hint: lang.translate('first_name'),
+                                      isIPad: isIPad,
+                                      lang: lang,
+                                    ),
                                   SizedBox(height: 20.h),
                                   _buildTextField(
                                     controller: _nomController,
                                     focusNode: _nomFocus,
-                                    label: 'Nom *',
-                                    hint: 'Nom',
+                                    label: lang.translate('last_name'),
+                                    hint: lang.translate('last_name'),
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   SizedBox(height: 20.h),
                                   _buildTextField(
                                     controller: _emailController,
                                     focusNode: _emailFocus,
-                                    label: 'Email *',
-                                    hint: 'Email',
+                                    label: lang.translate('email'),
+                                    hint: lang.translate('email'),
                                     icon: Icons.email_outlined,
                                     keyboardType: TextInputType.emailAddress,
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                   SizedBox(height: 20.h),
                                   _buildTextField(
                                     controller: _telephoneController,
                                     focusNode: _telephoneFocus,
-                                    label: 'Téléphone *',
-                                    hint: 'Téléphone',
+                                    label: lang.translate('phone'),
+                                    hint: lang.translate('phone'),
                                     icon: Icons.phone_outlined,
                                     keyboardType: TextInputType.phone,
                                     isIPad: isIPad,
+                                    lang: lang,
                                   ),
                                 ],
                               ),
@@ -229,7 +234,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -255,7 +260,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
   );
 }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -298,7 +303,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -310,7 +315,7 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
                         ),
                         // Étape 1/5 à droite
                         Text(
-                          'Étape 1/5',
+                          '${lang.translate('step')} 1/5',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -367,10 +372,11 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
     required TextEditingController controller,
     FocusNode? focusNode,
     required String label,
-    required String hint,
+    required String hint, 
     IconData? icon,
     TextInputType? keyboardType,
     required bool isIPad,
+    required LanguageProvider lang,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,10 +423,10 @@ class _InscriptionProfessionnelStep1ScreenState extends State<InscriptionProfess
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Ce champ est obligatoire';
+              return lang.translate('field_required_err');
             }
-            if (label.contains('Email') && !value.contains('@')) {
-              return 'Email invalide';
+            if (keyboardType == TextInputType.emailAddress && !value.contains('@')) {
+              return lang.translate('invalid_email_err');
             }
             return null;
           },

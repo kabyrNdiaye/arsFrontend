@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import 'inscription_professionnel_step3_screen.dart';
 
 class InscriptionProfessionnelStep2Screen extends StatefulWidget {
@@ -103,7 +105,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -122,7 +124,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(isIPad),
+          _buildHeader(isIPad, lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -162,7 +164,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: isIPad ? 24.h : 20.h),
                             Text(
-                              'Votre adresse',
+                              lang.translate('your_address'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -172,7 +174,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: 8.h),
                             Text(
-                              'Où êtes-vous basé ?',
+                              lang.translate('where_are_you_based'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -188,7 +190,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                 children: [
                                   // Date de naissance
                                   Text(
-                                    'Date de naissance *',
+                                    lang.translate('birth_date_req'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -202,7 +204,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                       child: TextFormField(
                                         controller: _dateNaissanceController,
                                         decoration: InputDecoration(
-                                          hintText: 'jj/mm/aaaa',
+                                          hintText: lang.translate('birth_date_hint'),
                                           hintStyle: getSourceSerifProStyle(
                                             fontSize: 14.sp,
                                             color: Colors.grey[400],
@@ -231,7 +233,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                         ),
                                         validator: (value) {
                                           if (value == null || value.isEmpty) {
-                                            return 'La date de naissance est obligatoire';
+                                              return lang.translate('birth_date_required_err');
                                           }
                                           return null;
                                         },
@@ -243,7 +245,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                   
                                   // Adresse complète
                                   Text(
-                                    'Adresse complète *',
+                                    lang.translate('full_address_req'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -255,7 +257,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                     controller: _adresseController,
                                     focusNode: _adresseFocus,
                                     decoration: InputDecoration(
-                                      hintText: '12 Rue de la République',
+                                      hintText: lang.translate('address_hint'),
                                       hintStyle: getSourceSerifProStyle(
                                         fontSize: 14.sp,
                                         color: Colors.grey[400],
@@ -282,7 +284,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return 'L\'adresse est obligatoire';
+                                        return lang.translate('address_required_err');
                                       }
                                       return null;
                                     },
@@ -299,7 +301,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Code postal *',
+                                              lang.translate('postal_code_req'),
                                               style: getSourceSerifProStyle(
                                                 fontSize: 14.sp,
                                                 color: Colors.black87,
@@ -312,7 +314,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                               focusNode: _codePostalFocus,
                                               keyboardType: TextInputType.number,
                                               decoration: InputDecoration(
-                                                hintText: '75001',
+                                                hintText: lang.translate('postal_code_hint'),
                                                 hintStyle: getSourceSerifProStyle(
                                                   fontSize: 14.sp,
                                                   color: Colors.grey[400],
@@ -339,7 +341,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                               ),
                                               validator: (value) {
                                                 if (value == null || value.isEmpty) {
-                                                  return 'Obligatoire';
+                                                  return lang.translate('field_required_err');
                                                 }
                                                 return null;
                                               },
@@ -356,7 +358,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Ville *',
+                                              lang.translate('city_req'),
                                               style: getSourceSerifProStyle(
                                                 fontSize: 14.sp,
                                                 color: Colors.black87,
@@ -368,7 +370,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                               controller: _villeController,
                                               focusNode: _villeFocus,
                                               decoration: InputDecoration(
-                                                hintText: 'Paris',
+                                                hintText: lang.translate('city_hint'),
                                                 hintStyle: getSourceSerifProStyle(
                                                   fontSize: 14.sp,
                                                   color: Colors.grey[400],
@@ -395,7 +397,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                                               ),
                                               validator: (value) {
                                                 if (value == null || value.isEmpty) {
-                                                  return 'Obligatoire';
+                                                  return lang.translate('field_required_err');
                                                 }
                                                 return null;
                                               },
@@ -453,7 +455,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -478,7 +480,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
     );
   }
 
-  Widget _buildHeader(bool isIPad) {
+  Widget _buildHeader(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -521,7 +523,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -533,7 +535,7 @@ class _InscriptionProfessionnelStep2ScreenState extends State<InscriptionProfess
                         ),
                         // Étape 2/5 à droite
                         Text(
-                          'Étape 2/5',
+                          '${lang.translate('step')} 2/5',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,

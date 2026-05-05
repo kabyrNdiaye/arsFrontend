@@ -9,6 +9,9 @@ import 'dart:math' as math;
 import '../auth/login_screen_2.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/language_provider.dart';
+import '../../providers/mission_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -64,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
+    final langProvider = Provider.of<LanguageProvider>(context);
     
     // Obtenir l'utilisateur connecté pour déterminer la couleur du header
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -115,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             activeIcon: Icon(Icons.home),
-            label: 'Accueil',
+            label: langProvider.translate('home'),
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
@@ -138,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Icon(Icons.work, color: Color(0xFF0059AB));
               },
             ),
-            label: 'Missions',
+            label: langProvider.translate('missions'),
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
@@ -159,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Icon(Icons.school, color: Color(0xFF0059AB));
               },
             ),
-            label: 'Formation',
+            label: langProvider.translate('training'),
           ),
           BottomNavigationBarItem(
             icon: Image.asset(
@@ -180,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Icon(Icons.person, color: Color(0xFF0059AB));
               },
             ),
-            label: 'Profil',
+            label: langProvider.translate('profile'),
           ),
         ],
       ),
@@ -189,12 +193,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab() {
+    final langProvider = Provider.of<LanguageProvider>(context);
     return Container(
       color: Color(0xFFF4F6F9), // Fond gris très clair
       child: Column(
         children: [
           // Header avec fond bleu qui s'étend jusqu'en haut
-          _buildHeader(),
+          _buildHeader(langProvider),
           
           // Contenu scrollable
           Expanded(
@@ -203,22 +208,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Section Prochaine Mission
-                  _buildNextMissionSection(),
+                  _buildNextMissionSection(langProvider),
                   
                   SizedBox(height: 20.h),
                   
                   // Section Formation en cours
-                  _buildCurrentTrainingSection(),
+                  _buildCurrentTrainingSection(langProvider),
                   
                   SizedBox(height: 20.h),
                   
                   // Section Missions
-                  _buildMissionsSection(),
+                  _buildMissionsSection(langProvider),
                   
                   SizedBox(height: 20.h),
                   
                   // Section Historique des paiements
-                  _buildPaymentHistorySection(),
+                  _buildPaymentHistorySection(langProvider),
                   
                   SizedBox(height: 20.h),
                 ],
@@ -231,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Grand header bleu qui s'étend depuis le haut
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider langProvider) {
     // Obtenir la couleur du header selon l'utilisateur connecté
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
@@ -299,55 +304,64 @@ class _HomeScreenState extends State<HomeScreen> {
                     size: 18.sp,
                     color: Colors.white,
                   ),
-                  SizedBox(width: 8.w),
-                  // Notification avec badge rouge
-                  Stack(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.notifications_outlined,
-                          size: 24.sp,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {
-                          // Navigation vers notifications
+                  // Icône notifications
+                  Consumer2<NotificationProvider, MissionProvider>(
+                    builder: (context, notifProvider, missionProvider, child) {
+                      final totalUnread = missionProvider.totalUnreadMessagesCount + missionProvider.newMissionsCount;
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          // Navigation désactivée - Indicateur uniquement
                         },
-                      ),
-                      Positioned(
-                        right: 8.w,
-                        top: 8.h,
-                        child: Container(
-                          width: 18.w,
-                          height: 18.h,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '2',
-                              style: getSourceSerifProStyle(
-                                color: Colors.white,
-                                fontSize: 10.sp,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white,
+                              size: 24.sp,
                             ),
-                          ),
+                            if (totalUnread > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: headerColor, width: 1),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 14.w,
+                                    minHeight: 14.w,
+                                  ),
+                                  child: Text(
+                                    totalUnread > 9 ? '9+' : totalUnread.toString(),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
             ],
           ),
-          
           SizedBox(height: 20.h),
           
           // "TABLEAU DE BORD" centré sous les icônes
           Center(
             child: Text(
-              'TABLEAU DE BORD',
+              langProvider.translate('dashboard'),
               style: getSourceSerifProStyle(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.bold,
@@ -369,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bienvenu,',
+                      langProvider.translate('welcome'),
                       style: getSourceSerifProStyle(
                         fontSize: 22.sp,
                         fontWeight: FontWeight.bold,
@@ -405,16 +419,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/icon_personne.png',
-                    width: 60.w,
-                    height: 60.h,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.person,
-                        size: 40.sp,
-                        color: Color(0xFF0053A6),
+                  child: Builder(
+                    builder: (context) {
+                      final authProvider = Provider.of<AuthProvider>(context);
+                      final photoUrl = authProvider.user?.photoProfil;
+                      if (photoUrl != null) {
+                        return Image.network(
+                          photoUrl,
+                          width: 60.w,
+                          height: 60.h,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.person,
+                              size: 40.sp,
+                              color: Color(0xFF0053A6),
+                            );
+                          },
+                        );
+                      }
+                      return Image.asset(
+                        'assets/images/icon_personne.png',
+                        width: 60.w,
+                        height: 60.h,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.person,
+                            size: 40.sp,
+                            color: Color(0xFF0053A6),
+                          );
+                        },
                       );
                     },
                   ),
@@ -476,16 +511,37 @@ class _HomeScreenState extends State<HomeScreen> {
               shape: BoxShape.circle,
             ),
             child: ClipOval(
-              child: Image.asset(
-                'assets/images/icon_personne.png',
-                width: 60.w,
-                height: 60.h,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.person,
-                    size: 40.sp,
-                    color: Color(0xFF0053A6),
+              child: Builder(
+                builder: (context) {
+                  final authProvider = Provider.of<AuthProvider>(context);
+                  final photoUrl = authProvider.user?.photoProfil;
+                  if (photoUrl != null) {
+                    return Image.network(
+                      photoUrl,
+                      width: 60.w,
+                      height: 60.h,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.person,
+                          size: 40.sp,
+                          color: Color(0xFF0053A6),
+                        );
+                      },
+                    );
+                  }
+                  return Image.asset(
+                    'assets/images/icon_personne.png',
+                    width: 60.w,
+                    height: 60.h,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.person,
+                        size: 40.sp,
+                        color: Color(0xFF0053A6),
+                      );
+                    },
                   );
                 },
               ),
@@ -497,7 +553,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Section Prochaine Mission - Carte blanche avec coins arrondis
-  Widget _buildNextMissionSection() {
+  Widget _buildNextMissionSection(LanguageProvider langProvider) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 20.w),
       decoration: BoxDecoration(
@@ -555,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SizedBox(width: 8.w),
                   Text(
-                    'Prochaine Mission',
+                    langProvider.translate('next_mission'),
                     style: getSourceSerifProStyle(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.bold,
@@ -612,14 +668,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Section Formation en cours avec carte de module
-  Widget _buildCurrentTrainingSection() {
+  Widget _buildCurrentTrainingSection(LanguageProvider langProvider) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Formation en cours:',
+            langProvider.translate('current_training'),
             style: getSourceSerifProStyle(
               fontSize: 18.sp,
               fontWeight: FontWeight.bold,
@@ -716,7 +772,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Continuez',
+                            langProvider.translate('continue'),
                             style: getSourceSerifProStyle(
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w600,
@@ -759,7 +815,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Section Missions en liste verticale
-  Widget _buildMissionsSection() {
+  Widget _buildMissionsSection(LanguageProvider langProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -769,7 +825,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Missions',
+                langProvider.translate('missions'),
                 style: getSourceSerifProStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.bold,
@@ -781,7 +837,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Navigation vers toutes les missions
                 },
                 child: Text(
-                  'Voir plus',
+                  langProvider.translate('see_more'),
                   style: getSourceSerifProStyle(
                     fontSize: 14.sp,
                     color: Colors.grey[600],
@@ -796,11 +852,11 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.symmetric(horizontal: 20.w),
           child: Column(
             children: [
-              _buildMissionCard(),
+              _buildMissionCard(langProvider),
               SizedBox(height: 12.h),
-              _buildMissionCard(),
+              _buildMissionCard(langProvider),
               SizedBox(height: 12.h),
-              _buildMissionCard(),
+              _buildMissionCard(langProvider),
             ],
           ),
         ),
@@ -808,7 +864,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMissionCard() {
+  Widget _buildMissionCard(LanguageProvider langProvider) {
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -835,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(width: 6.w),
               Text(
-                'Préparation',
+                langProvider.translate('preparation'),
                 style: getSourceSerifProStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w600,
@@ -916,7 +972,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   elevation: 0,
                 ),
                 child: Text(
-                  'Refuser',
+                  langProvider.translate('refuse'),
                   style: getSourceSerifProStyle(
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w600,
@@ -940,7 +996,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   elevation: 0,
                 ),
                 child: Text(
-                  'Valider',
+                  langProvider.translate('validate'),
                   style: getSourceSerifProStyle(
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w600,
@@ -955,7 +1011,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Section Historique des paiements
-  Widget _buildPaymentHistorySection() {
+  Widget _buildPaymentHistorySection(LanguageProvider langProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -965,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Historique des paiements',
+                langProvider.translate('payment_history'),
                 style: getSourceSerifProStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.bold,
@@ -992,11 +1048,11 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.symmetric(horizontal: 20.w),
           child: Column(
             children: [
-              _buildPaymentItem('Préparation', '13 Octobre 2022', '200 €', hasDelete: false),
+              _buildPaymentItem(langProvider.translate('preparation'), '13 Octobre 2022', '200 €', hasDelete: false, langProvider: langProvider),
               SizedBox(height: 8.h),
-              _buildPaymentItem('Préparation', '13 Octobre 2022', '200 €', hasDelete: false),
+              _buildPaymentItem(langProvider.translate('preparation'), '13 Octobre 2022', '200 €', hasDelete: false, langProvider: langProvider),
               SizedBox(height: 8.h),
-              _buildPaymentItem('Préparation', '13 Octobre 2022', '200 €', hasDelete: true),
+              _buildPaymentItem(langProvider.translate('preparation'), '13 Octobre 2022', '200 €', hasDelete: true, langProvider: langProvider),
             ],
           ),
         ),
@@ -1004,7 +1060,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPaymentItem(String type, String date, String amount, {required bool hasDelete}) {
+  Widget _buildPaymentItem(String type, String date, String amount, {required bool hasDelete, required LanguageProvider langProvider}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1103,13 +1159,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMissionsTab() {
+    final langProvider = Provider.of<LanguageProvider>(context);
     return Column(
       children: [
-        _buildSimpleHeader('Mes Missions'),
+        _buildSimpleHeader(langProvider.translate('my_missions')),
         Expanded(
           child: Center(
             child: Text(
-              'Mes Missions',
+              langProvider.translate('my_missions'),
               style: getSourceSerifProStyle(
                 fontSize: 20.sp,
               ),
@@ -1121,13 +1178,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFormationTab() {
+    final langProvider = Provider.of<LanguageProvider>(context);
     return Column(
       children: [
-        _buildSimpleHeader('Mes Formations'),
+        _buildSimpleHeader(langProvider.translate('my_trainings')),
         Expanded(
           child: Center(
             child: Text(
-              'Formation',
+              langProvider.translate('training'),
               style: getSourceSerifProStyle(
                 fontSize: 20.sp,
               ),
@@ -1139,13 +1197,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProfileTab() {
+    final langProvider = Provider.of<LanguageProvider>(context);
     return Column(
       children: [
-        _buildSimpleHeader('Mon Profil'),
+        _buildSimpleHeader(langProvider.translate('my_profile')),
         Expanded(
           child: Center(
             child: Text(
-              'Profil',
+              langProvider.translate('profile'),
               style: getSourceSerifProStyle(
                 fontSize: 20.sp,
               ),

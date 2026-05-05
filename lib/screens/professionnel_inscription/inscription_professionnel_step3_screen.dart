@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/language_provider.dart';
 import 'inscription_professionnel_step4_screen.dart';
 
 class InscriptionProfessionnelStep3Screen extends StatefulWidget {
@@ -38,33 +40,33 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
 
   // Liste des fonctions principales
   final List<String> _fonctions = [
-    'Cuisinier',
-    'Chef de cuisine',
-    'Pâtissier',
-    'Commis de cuisine',
-    'Aide cuisinier',
+    'cook',
+    'head_chef',
+    'pastry_chef',
+    'kitchen_commis',
+    'kitchen_helper',
   ];
 
   // Liste des années d'expérience
   final List<String> _anneesExperience = [
-    'Moins de 2 ans',
-    '2 à 5 ans',
-    '5 à 10 ans',
-    'Plus de 10 ans',
+    'under_2_years',
+    '2_to_5_years',
+    '5_to_10_years',
+    'over_10_years',
   ];
 
   // Liste des spécialités
   final List<String> _specialites = [
-    'Cuisine traditionnelle',
-    'Cuisine diététique',
-    'Textures modifiées',
-    'Pâtisserie',
-    'Boulangerie',
+    'traditional_cuisine',
+    'dietary_cuisine',
+    'modified_textures',
+    'pastry',
+    'bakery',
   ];
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -83,7 +85,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(isIPad),
+          _buildHeader(isIPad, lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -123,7 +125,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: isIPad ? 24.h : 20.h),
                             Text(
-                              'Expérience professionnelle',
+                              lang.translate('professional_experience'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 22.sp : 20.sp,
                                 fontWeight: FontWeight.bold,
@@ -133,7 +135,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                             ),
                             SizedBox(height: 8.h),
                             Text(
-                              'Parlez-nous de votre parcours',
+                              lang.translate('tell_us_path'),
                               style: getSourceSerifProStyle(
                                 fontSize: isIPad ? 14.sp : 13.sp,
                                 color: Colors.grey[600],
@@ -149,7 +151,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                 children: [
                                   // Fonction principale - Dropdown
                                   Text(
-                                    'Fonction principale *',
+                                    lang.translate('main_function_req'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -159,8 +161,9 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                   SizedBox(height: 8.h),
                                   _buildCustomDropdown(
                                     value: _selectedFonction,
-                                    hint: 'Sélectionnez votre fonction',
+                                    hint: lang.translate('select_function'),
                                     items: _fonctions,
+                                    lang: lang,
                                     onChanged: (value) {
                                       setState(() {
                                         _selectedFonction = value;
@@ -172,7 +175,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                   
                                   // Années d'expérience - Dropdown
                                   Text(
-                                    'Années d\'expérience *',
+                                    lang.translate('years_experience_req'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -182,8 +185,9 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                   SizedBox(height: 8.h),
                                   _buildCustomDropdown(
                                     value: _selectedExperience,
-                                    hint: 'Sélectionnez',
+                                    hint: lang.translate('select'),
                                     items: _anneesExperience,
+                                    lang: lang,
                                     onChanged: (value) {
                                       setState(() {
                                         _selectedExperience = value;
@@ -195,7 +199,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                   
                                   // Spécialités - Multi-select checkboxes
                                   Text(
-                                    'Spécialités *',
+                                    lang.translate('specialties_req'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 14.sp,
                                       color: Colors.black87,
@@ -204,7 +208,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                   ),
                                   SizedBox(height: 4.h),
                                   Text(
-                                    'Sélectionnez vos domaines d\'expertise',
+                                    lang.translate('select_expertise_domains'),
                                     style: getSourceSerifProStyle(
                                       fontSize: 12.sp,
                                       color: Colors.grey[500],
@@ -218,6 +222,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                                     return _buildSpecialiteItem(
                                       specialite: specialite,
                                       isSelected: isSelected,
+                                      lang: lang,
                                       onTap: () {
                                         setState(() {
                                           if (isSelected) {
@@ -281,7 +286,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Continuer',
+                                lang.translate('continue'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -316,7 +321,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
            _selectedSpecialites.isNotEmpty;
   }
 
-  Widget _buildHeader(bool isIPad) {
+  Widget _buildHeader(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -359,7 +364,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -371,7 +376,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                         ),
                         // Étape 3/5 à droite
                         Text(
-                          'Étape 3/5',
+                          '${lang.translate('step')} 3/5',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -429,6 +434,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
     required String hint,
     required List<String> items,
     required Function(String?) onChanged,
+    required LanguageProvider lang,
   }) {
     // Calculer la largeur disponible (écran - padding horizontal)
     final screenWidth = MediaQuery.of(context).size.width;
@@ -501,7 +507,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
                       SizedBox(width: 18.sp),
                     SizedBox(width: 8.w),
                     Text(
-                      item,
+                      lang.translate(item),
                       style: getSourceSerifProStyle(
                         fontSize: 14.sp,
                         color: Colors.white,
@@ -527,7 +533,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              value ?? hint,
+              value != null ? lang.translate(value!) : hint,
               style: getSourceSerifProStyle(
                 fontSize: 14.sp,
                 color: value != null ? Colors.black87 : Colors.grey[400],
@@ -544,6 +550,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
     required String specialite,
     required bool isSelected,
     required VoidCallback onTap,
+    required LanguageProvider lang,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -562,7 +569,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              specialite,
+              lang.translate(specialite),
               style: getSourceSerifProStyle(
                 fontSize: 14.sp,
                 color: Colors.black, // Toujours noir

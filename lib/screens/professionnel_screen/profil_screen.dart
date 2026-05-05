@@ -4,14 +4,22 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
-import '../auth/login_screen_2.dart';
+import '../../providers/document_provider.dart';
+import '../../models/user_model.dart';
+import '../../services/api_service.dart';
+import '../shared/file_preview_screen.dart';
+import '../../screens/auth/login_screen_2.dart';
 import 'parametres_screen.dart';
+import 'professionnel_edit_profil_screen.dart';
+import 'professionnel_change_password_screen.dart';
+import 'professionnel_edit_documents_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfilScreen extends StatefulWidget {
   final String? userName;
   final String? userRole;
-  // Documents uploadés durant l'inscription (passés en paramètre)
   final List<String>? initialDocuments;
 
   const ProfilScreen({
@@ -26,64 +34,168 @@ class ProfilScreen extends StatefulWidget {
 }
 
 class _ProfilScreenState extends State<ProfilScreen> {
-  // Liste des documents (initialisée avec les documents de l'inscription)
-  late List<String> _documents;
+  bool _isLoading = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final langProvider = Provider.of<LanguageProvider>(context);
-    // Initialiser avec les documents de l'inscription ou des données par défaut
-    if (widget.initialDocuments != null) {
-      _documents = List.from(widget.initialDocuments!);
-    } else {
-      _documents = [
-        langProvider.translate('cv'),
-        langProvider.translate('id_card'),
-        langProvider.translate('cook_diploma'),
-      ];
-    }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<DocumentProvider>(context, listen: false).fetchDocuments();
+    });
   }
 
-  // Fonction pour ajouter un document
+  List<Map<String, String?>> _getDocuments(LanguageProvider langProvider) {
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    final docs = <Map<String, String?>>[];
+
+    // Helper : extrait le nom de fichier depuis une URL pour la déduplication
+    String _fileNameFromUrl(String? url) {
+      if (url == null || url.isEmpty) return '';
+      return url.split('/').last.split('?').first.toLowerCase();
+    }
+
+    // Helper : ajoute un doc seulement s'il n'est pas déjà présent (par URL ou nom de fichier)
+    void addIfNew(String title, String? url) {
+      if (url == null || url.isEmpty) return;
+      final fileName = _fileNameFromUrl(url);
+      final alreadyExists = docs.any((d) {
+        if (d['url'] == url) return true;
+        if (fileName.isNotEmpty && _fileNameFromUrl(d['url']) == fileName) return true;
+        return false;
+      });
+      if (!alreadyExists) {
+        docs.add({'title': title, 'url': url});
+      }
+    }
+
+    // 1. Documents fixes du profil (diplôme, certificat, permis)
+    addIfNew(langProvider.translate('cook_diploma'), user?.diplomePath);
+    addIfNew(langProvider.translate('medical_cert'), user?.certificatMedical);
+    addIfNew(langProvider.translate('driving_license'), user?.permiConduire);
+
+    // 2. Documents dynamiques du rawDocuments
+    if (user?.rawDocuments != null) {
+      // Clés à ignorer car déjà gérées ci-dessus (on les ajoute via diplomePath etc.)
+      const skipKeys = {
+        'photo_profil_path', 'profileImage', 'photo_profil',
+      };
+      user!.rawDocuments!.forEach((key, url) {
+        if (skipKeys.contains(key)) return;
+        if (key.toLowerCase().contains('photo') || key.toLowerCase().contains('profil')) return;
+
+        // Construire un label lisible
+        String label = key
+            .replaceAll('_path', '')
+            .replaceAll(RegExp(r'_\d+$'), '')
+            .replaceAll('_', ' ')
+            .trim();
+
+        // Traduire les labels connus
+        if (label == 'diplome') label = langProvider.translate('cook_diploma') ?? 'Diplôme';
+        else if (label == 'certificat medical') label = langProvider.translate('medical_cert') ?? 'Certificat médical';
+        else if (label == 'permis conduire') label = langProvider.translate('driving_license') ?? 'Permis de conduire';
+        else if (label.isNotEmpty) label = label[0].toUpperCase() + label.substring(1);
+
+        addIfNew(label, url);
+      });
+    }
+
+    // 3. Documents uploadés via DocumentProvider (session courante ou API /documents)
+    final docProvider = Provider.of<DocumentProvider>(context);
+    for (final doc in docProvider.documents) {
+      final String? rawUrl = doc['fichier_url'] ?? doc['url'] ?? doc['fichier'];
+      final String? url = User.sanitizeUrl(rawUrl);
+      final String title = doc['nom'] ?? doc['type'] ?? doc['title'] ?? 'Document';
+      // Exclure les photos de profil
+      if (url != null) {
+        final ext = url.split('.').last.toLowerCase().split('?').first;
+        if (ext == 'avif' || ext == 'webp') continue;
+        if (title.toLowerCase().contains('photo') ||
+            title.toLowerCase().contains('profil')) continue;
+      }
+      addIfNew(title, url);
+    }
+
+    // Si aucun document réel, afficher des placeholders
+    if (docs.isEmpty) {
+      docs.addAll([
+        {'title': langProvider.translate('cv'), 'url': null},
+        {'title': langProvider.translate('id_card'), 'url': null},
+        {'title': langProvider.translate('cook_diploma'), 'url': null},
+      ]);
+    }
+
+    return docs;
+  }
+
   Future<void> _ajouterDocument(LanguageProvider langProvider) async {
+    final docProvider = Provider.of<DocumentProvider>(context, listen: false);
+    
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+        withData: kIsWeb,
       );
  
       if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          _documents.add(result.files.first.name);
-        });
+        final file = result.files.first;
         
-        // Afficher un message de confirmation
+        setState(() => _isLoading = true);
+        
+        final success = await docProvider.uploadDocument(
+          kIsWeb ? null : file.path,
+          'autre',
+          fileBytes: file.bytes,
+          fileName: file.name,
+        );
+        
+        setState(() => _isLoading = false);
+
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${langProvider.translate('doc_added') ?? 'Document ajouté'} : ${file.name}'),
+                backgroundColor: const Color(0xFF4CAF50),
+              ),
+            );
+            // On rafraîchit aussi le User pour être sûr
+            Provider.of<AuthProvider>(context, listen: false).loadProfile();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Erreur: ${docProvider.error}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${langProvider.translate('doc_added')} "${result.files.first.name}"'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 2),
+            content: Text(langProvider.translate('doc_error') ?? 'Erreur lors de l\'ajout du document'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(langProvider.translate('doc_error')),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
-  // Fonction de déconnexion
-  void _deconnexion() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => LoginScreen2()),
-      (route) => false,
-    );
+  Future<void> _deconnexion() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.logout();
+    
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => LoginScreen2()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -93,7 +205,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: Color(0xFF0059AB), // Même couleur que le header
+        statusBarColor: Color(0xFF0059AB),
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
         systemNavigationBarColor: Colors.white,
@@ -103,30 +215,20 @@ class _ProfilScreenState extends State<ProfilScreen> {
         backgroundColor: Color(0xFFF5F7FA),
         body: Column(
           children: [
-            // Header bleu avec avatar
             _buildHeader(langProvider),
-            
-            // Contenu
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: 20.h),
-                    
-                    // Section Documents
                     _buildDocumentsSection(langProvider),
-                    
                     SizedBox(height: 16.h),
-                    
-                    // Section Paramètres
                     _buildParametresSection(langProvider),
-                    
                     SizedBox(height: 16.h),
-                    
-                    // Bouton Déconnexion
+                    _buildCompteSection(langProvider),
+                    SizedBox(height: 16.h),
                     _buildDeconnexionButton(langProvider),
-                    
                     SizedBox(height: 32.h),
                   ],
                 ),
@@ -139,6 +241,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
   }
 
   Widget _buildHeader(LanguageProvider langProvider) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -149,7 +254,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
         top: false,
         child: Column(
           children: [
-            // Trait horizontal en haut, juste sous la barre de statut
             Padding(
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top > 0 ? MediaQuery.of(context).padding.top + 8.h : 32.h,
@@ -165,7 +269,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
               padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 32.h),
               child: Column(
                 children: [
-                  // Avatar
                   Container(
                     width: 90.w,
                     height: 90.h,
@@ -173,42 +276,35 @@ class _ProfilScreenState extends State<ProfilScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/icon_personne.png',
-                        width: 90.w,
-                        height: 90.h,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.white,
-                            child: Icon(
-                              Icons.person_outline,
-                              size: 50.sp,
-                              color: Color(0xFF90CAF9),
+                      child: user?.photoProfil != null
+                          ? Image.network(
+                              user!.photoProfil!,
+                              width: 90.w,
+                              height: 90.h,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => _buildPlaceholderAvatar(),
+                            )
+                          : Image.asset(
+                              'assets/images/icon_personne.png',
+                              width: 90.w,
+                              height: 90.h,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => _buildPlaceholderAvatar(),
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ),
-                  
                   SizedBox(height: 16.h),
-                  
-                  // Nom
                   Text(
-                    widget.userName ?? langProvider.translate('default_user'),
+                    user?.fullName ?? langProvider.translate('default_user') ?? 'Utilisateur',
                     style: getInterStyle(
                       fontSize: 22.sp,
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  
                   SizedBox(height: 4.h),
-                  
-                  // Rôle
                   Text(
-                    widget.userRole ?? langProvider.translate('default_role'),
+                    user?.email ?? langProvider.translate('default_role') ?? 'Email',
                     style: getInterStyle(
                       fontSize: 14.sp,
                       color: Colors.white.withOpacity(0.8),
@@ -243,22 +339,16 @@ class _ProfilScreenState extends State<ProfilScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            langProvider.translate('documents'),
+            langProvider.translate('documents') ?? 'Documents',
             style: getInterStyle(
               fontSize: 15.sp,
               color: Colors.black87,
               fontWeight: FontWeight.w700,
             ),
           ),
-          
           SizedBox(height: 8.h),
-          
-          // Liste des documents
-          ..._documents.map((doc) => _buildDocumentItem(doc, langProvider)).toList(),
-          
+          ..._getDocuments(langProvider).map((doc) => _buildDocumentItem(doc['title']!, doc['url'], langProvider)).toList(),
           SizedBox(height: 8.h),
-          
-          // Bouton Ajouter un document
           GestureDetector(
             onTap: () => _ajouterDocument(langProvider),
             child: Container(
@@ -278,7 +368,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
                   ),
                   SizedBox(width: 6.w),
                   Text(
-                    langProvider.translate('add_document'),
+                    langProvider.translate('add_document') ?? 'Ajouter un document',
                     style: getInterStyle(
                       fontSize: 13.sp,
                       color: Color(0xFF0059AB),
@@ -294,16 +384,32 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
-  Widget _buildDocumentItem(String title, LanguageProvider langProvider) {
+  Widget _buildDocumentItem(String title, String? url, LanguageProvider langProvider) {
     return GestureDetector(
       onTap: () {
-        // Action voir document
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${langProvider.translate('doc_opening')} "$title"'),
-            duration: Duration(seconds: 1),
-          ),
-        );
+        if (url != null && url.isNotEmpty) {
+          final String ext = url.split('.').last.toLowerCase();
+          final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png') ? 'image' : 'pdf';
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => FilePreviewScreen(
+                fileUrl: url,
+                fileName: title,
+                fileType: fileType,
+                authToken: ApiService().token,
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(langProvider.translate('doc_not_uploaded') ?? 'Document non téléchargé'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       },
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -364,7 +470,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                langProvider.translate('settings'),
+                langProvider.translate('settings') ?? 'Paramètres',
                 style: getInterStyle(
                   fontSize: 15.sp,
                   color: Colors.black87,
@@ -383,11 +489,113 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
+  Widget _buildCompteSection(LanguageProvider langProvider) {
+    const Color primaryBlue = Color(0xFF0059AB);
+    
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildCompteItem(
+            icon: Icons.person_outline,
+            title: langProvider.translate('modify_info') ?? 'Modifier mes informations',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfessionnelEditProfilScreen()),
+              );
+            },
+          ),
+          Divider(height: 1, color: Colors.grey[100], indent: 56.w),
+          _buildCompteItem(
+            icon: Icons.description_outlined,
+            title: 'Modifier mes documents',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfessionnelEditDocumentsScreen(),
+                ),
+              );
+            },
+          ),
+          Divider(height: 1, color: Colors.grey[100], indent: 56.w),
+          _buildCompteItem(
+            icon: Icons.lock_outline,
+            title: langProvider.translate('change_password') ?? 'Changer mon mot de passe',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfessionnelChangePasswordScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompteItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    const Color primaryBlue = Color(0xFF0059AB);
+    
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        child: Row(
+          children: [
+            Container(
+              width: 32.w,
+              height: 32.h,
+              decoration: BoxDecoration(
+                color: primaryBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: primaryBlue, size: 18.sp),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                title,
+                style: getInterStyle(
+                  fontSize: 14.sp,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey[400],
+              size: 20.sp,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDeconnexionButton(LanguageProvider langProvider) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: GestureDetector(
-        onTap: _deconnexion, // Déconnexion directe
+        onTap: _deconnexion,
         child: Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -405,7 +613,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
               ),
               SizedBox(width: 8.w),
               Text(
-                langProvider.translate('logout'),
+                langProvider.translate('logout') ?? 'Se déconnecter',
                 style: getInterStyle(
                   fontSize: 14.sp,
                   color: Color(0xFFE53935),
@@ -415,6 +623,17 @@ class _ProfilScreenState extends State<ProfilScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderAvatar() {
+    return Container(
+      color: Colors.white,
+      child: Icon(
+        Icons.person_outline,
+        size: 50.sp,
+        color: const Color(0xFF90CAF9),
       ),
     );
   }

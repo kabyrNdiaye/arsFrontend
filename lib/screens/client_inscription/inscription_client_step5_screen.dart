@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
 import '../../utils/font_helper.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/language_provider.dart';
+import '../auth/login_screen_2.dart';
 
 class InscriptionClientStep5Screen extends StatefulWidget {
   final Map<String, dynamic>? previousData;
@@ -19,13 +23,14 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
   final Color _lightGreen = Color(0xFFE8F5E9);
 
   // Documents
-  String? _contratPrestation;
-  String? _planLocaux;
-  String? _reglementInterieur;
+  PlatformFile? _contratPrestation;
+  PlatformFile? _planLocaux;
+  PlatformFile? _reglementInterieur;
 
   // Checkboxes
   bool _acceptConditions = false;
   bool _acceptNewsletter = false;
+  bool _isLoading = false;
 
   Future<void> _pickDocument(String type) async {
     try {
@@ -38,20 +43,84 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
         setState(() {
           switch (type) {
             case 'contrat':
-              _contratPrestation = result.files.single.name;
+              _contratPrestation = result.files.single;
               break;
             case 'plan':
-              _planLocaux = result.files.single.name;
+              _planLocaux = result.files.single;
               break;
             case 'reglement':
-              _reglementInterieur = result.files.single.name;
+              _reglementInterieur = result.files.single;
               break;
           }
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la sélection du fichier')),
+        SnackBar(content: Text(Provider.of<LanguageProvider>(context, listen: false).translate('pick_file_error'))),
+      );
+    }
+  }
+
+  Future<void> _handleRegistration() async {
+    setState(() => _isLoading = true);
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final data = widget.previousData ?? {};
+    
+    // Extraction de toutes les données collectées
+    // Étape 1 : Informations établissement
+    final String nomEtablissement = data['nomEtablissement'] ?? '';
+    final String typeEtablissement = data['typeEtablissement'] ?? '';
+    final String adresse = data['adresse'] ?? '';
+    final String codePostal = data['codePostal'] ?? '';
+    final String ville = data['ville'] ?? '';
+    final String telephoneEtablissement = data['telephoneEtablissement'] ?? '';
+    final String telephoneResponsable = data['telephone'] ?? '';
+    final String capacite = data['capacite'] ?? '';
+    
+    // Étape 2 : Informations personnelles
+    final String nom = data['nom'] ?? '';
+    final String prenom = data['prenom'] ?? '';
+    final String fonction = data['fonction'] ?? '';
+    
+    // Étape 3 : Informations de connexion
+    final String email = data['emailConnexion'] ?? '';
+    final String password = data['password'] ?? '';
+    
+    final success = await authProvider.register(
+      firstName: prenom,
+      lastName: nom,
+      email: email,
+      password: password,
+      phone: telephoneResponsable,
+      address: adresse,
+      role: 'client',
+      // Données spécifiques client
+      nomEtablissement: nomEtablissement,
+      typeEtablissement: typeEtablissement,
+      codePostal: codePostal,
+      ville: ville,
+      capacite: capacite,
+      fonction: fonction,
+      telephoneEtablissement: telephoneEtablissement,
+      // Documents (chemins)
+      contratPrestationPath: _contratPrestation,
+      planLocauxPath: _planLocaux,
+      reglementInterieurPath: _reglementInterieur,
+    );
+    
+    setState(() => _isLoading = false);
+    
+    if (success) {
+      final lang = Provider.of<LanguageProvider>(context, listen: false);
+      _showSuccessDialog(lang);
+    } else {
+      final lang = Provider.of<LanguageProvider>(context, listen: false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? lang.translate('registration_error')),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -59,6 +128,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
   @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
+    final lang = Provider.of<LanguageProvider>(context);
     
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -77,7 +147,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(lang),
           Expanded(
             child: SafeArea(
               top: false,
@@ -116,7 +186,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                             // Titre centré
                             Center(
                               child: Text(
-                                'Finalisation',
+                                lang.translate('finalization_title'),
                                 style: getSourceSerifProStyle(
                                   fontSize: isIPad ? 22.sp : 20.sp,
                                   fontWeight: FontWeight.bold,
@@ -131,7 +201,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                             // Sous-titre centré
                             Center(
                               child: Text(
-                                'Documents et validation',
+                                lang.translate('docs_validation_desc'),
                                 style: getSourceSerifProStyle(
                                   fontSize: isIPad ? 14.sp : 13.sp,
                                   color: Colors.grey[600],
@@ -144,17 +214,17 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                             SizedBox(height: isIPad ? 32.h : 24.h),
                             
                             // Section Documents
-                            _buildDocumentsSection(isIPad),
+                            _buildDocumentsSection(isIPad, lang),
                             
                             SizedBox(height: 24.h),
                             
                             // Section Conditions générales
-                            _buildConditionsSection(isIPad),
+                            _buildConditionsSection(isIPad, lang),
                             
                             SizedBox(height: 24.h),
                             
                             // Info box "Prêt à valider"
-                            _buildReadyBox(isIPad),
+                            _buildReadyBox(isIPad, lang),
                             
                             SizedBox(height: isIPad ? 50.h : 40.h),
                           ],
@@ -171,9 +241,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _acceptConditions ? () {
-                            _showSuccessDialog();
-                          } : null,
+                          onPressed: (_acceptConditions && !_isLoading) ? _handleRegistration : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primaryGreen,
                             foregroundColor: Colors.white,
@@ -185,26 +253,32 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                             ),
                             elevation: 0,
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Continuer',
-                                style: getSourceSerifProStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  color: _acceptConditions ? Colors.white : Colors.grey[500],
-                                ),
+                          child: _isLoading 
+                            ? SizedBox(
+                                height: 20.h,
+                                width: 20.w,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    lang.translate('continue'),
+                                    style: getSourceSerifProStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                      color: _acceptConditions ? Colors.white : Colors.grey[500],
+                                    ),
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Icon(
+                                    Icons.arrow_forward_ios, 
+                                    size: 16.sp, 
+                                    color: _acceptConditions ? Colors.white : Colors.grey[500],
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 6.w),
-                              Icon(
-                                Icons.arrow_forward_ios, 
-                                size: 16.sp, 
-                                color: _acceptConditions ? Colors.white : Colors.grey[500],
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                     ),
@@ -218,7 +292,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(LanguageProvider lang) {
     return Container(
       width: double.infinity,
       height: 100.h,
@@ -261,7 +335,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                               Icon(Icons.arrow_back_ios, color: Colors.white, size: 18.sp),
                               SizedBox(width: 4.w),
                               Text(
-                                'Retour',
+                                lang.translate('back'),
                                 style: getSourceSerifProStyle(
                                   fontSize: 16.sp,
                                   color: Colors.white,
@@ -271,9 +345,9 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                             ],
                           ),
                         ),
-                        // Étape 5/5 à droite
+                        // Étape 4/4 à droite
                         Text(
-                          'Étape 5/5',
+                          '${lang.translate('step')} 4/4',
                           style: getSourceSerifProStyle(
                             fontSize: 14.sp,
                             color: Colors.white,
@@ -326,7 +400,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
     );
   }
 
-  Widget _buildDocumentsSection(bool isIPad) {
+  Widget _buildDocumentsSection(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -355,7 +429,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
               ),
               SizedBox(width: 10.w),
             Text(
-              'Documents (optionnel)',
+              lang.translate('documents_optional'),
               style: getSourceSerifProStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.bold,
@@ -366,23 +440,23 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
           ),
           SizedBox(height: 16.h),
           _buildDocumentItem(
-            title: 'Contrat de prestation',
-            subtitle: 'PDF, max 10 MB',
-            fileName: _contratPrestation,
+            title: lang.translate('service_contract'),
+            subtitle: lang.translate('max_10mb_pdf'),
+            fileName: _contratPrestation?.name,
             onTap: () => _pickDocument('contrat'),
           ),
           SizedBox(height: 12.h),
           _buildDocumentItem(
-            title: 'Plan des locaux',
-            subtitle: 'PDF, max 10 MB',
-            fileName: _planLocaux,
+            title: lang.translate('premises_plan'),
+            subtitle: lang.translate('max_10mb_pdf'),
+            fileName: _planLocaux?.name,
             onTap: () => _pickDocument('plan'),
           ),
           SizedBox(height: 12.h),
           _buildDocumentItem(
-            title: 'Règlement intérieur',
-            subtitle: 'PDF, max 10 MB',
-            fileName: _reglementInterieur,
+            title: lang.translate('internal_rules'),
+            subtitle: lang.translate('max_10mb_pdf'),
+            fileName: _reglementInterieur?.name,
             onTap: () => _pickDocument('reglement'),
           ),
         ],
@@ -472,7 +546,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
     );
   }
 
-  Widget _buildConditionsSection(bool isIPad) {
+  Widget _buildConditionsSection(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -485,7 +559,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Conditions générales',
+            lang.translate('general_conditions_label'), // Wait, I used 'Conditions générales' in FR. Let's use a key.
             style: getSourceSerifProStyle(
               fontSize: 14.sp,
               fontWeight: FontWeight.bold,
@@ -527,15 +601,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                         fontWeight: FontWeight.w400,
                       ),
                       children: [
-                        TextSpan(text: 'J\'accepte les '),
-                        TextSpan(
-                          text: 'conditions d\'utilisation',
-                          style: getSourceSerifProStyle(
-                            fontSize: 13.sp,
-                            color: _primaryGreen,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        TextSpan(text: lang.translate('accept_terms')),
                         TextSpan(
                           text: ' *',
                           style: TextStyle(color: Colors.red),
@@ -575,7 +641,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                 SizedBox(width: 12.w),
                 Expanded(
                   child: Text(
-                    'Je souhaite recevoir les actualités par email',
+                    lang.translate('receive_news'),
                     style: getSourceSerifProStyle(
                       fontSize: 13.sp,
                       color: Colors.black87,
@@ -591,7 +657,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
     );
   }
 
-  Widget _buildReadyBox(bool isIPad) {
+  Widget _buildReadyBox(bool isIPad, LanguageProvider lang) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(16.w),
@@ -623,7 +689,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Prêt à valider !',
+                  lang.translate('ready_to_validate'),
                   style: getSourceSerifProStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.bold,
@@ -632,7 +698,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  'Votre inscription sera examinée par notre équipe. Vous recevrez un email de confirmation dans les 24h.',
+                  lang.translate('reg_review_desc'),
                   style: getSourceSerifProStyle(
                     fontSize: 12.sp,
                     color: Colors.grey[700],
@@ -647,7 +713,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
     );
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(LanguageProvider lang) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -674,7 +740,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
               ),
               SizedBox(height: 20.h),
               Text(
-                'Inscription réussie !',
+                lang.translate('registration_success'),
                 style: getSourceSerifProStyle(
                   fontSize: 20.sp,
                   fontWeight: FontWeight.bold,
@@ -684,7 +750,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
               ),
               SizedBox(height: 12.h),
               Text(
-                'Votre demande d\'inscription a été envoyée avec succès. Vous recevrez un email de confirmation.',
+                lang.translate('reg_success_client_desc'),
                 style: getSourceSerifProStyle(
                   fontSize: 14.sp,
                   color: Colors.grey[600],
@@ -696,8 +762,17 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  onPressed: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    await authProvider.logout();
+                    
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoginScreen2(),
+                      ),
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primaryGreen,
@@ -708,7 +783,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                     ),
                   ),
                   child: Text(
-                    'Retour à l\'accueil',
+                    lang.translate('go_to_login'),
                     style: getSourceSerifProStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,
