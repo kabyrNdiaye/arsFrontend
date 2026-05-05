@@ -25,9 +25,9 @@ class ApiConfig {
   static const String adminStats = '/stats/admin';
   static const String structureStats = '/stats/structure';
 
-  // Timeout pour les requêtes
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 15);
+  // Timeout pour les requêtes (Augmenté pour Render.com Free Tier)
+  static const Duration connectTimeout = Duration(seconds: 60);
+  static const Duration receiveTimeout = Duration(seconds: 60);
 
   // Headers par défaut
   static Map<String, String> getHeaders({String? token}) {
