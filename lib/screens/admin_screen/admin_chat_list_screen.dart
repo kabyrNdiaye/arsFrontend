@@ -151,6 +151,7 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
           : conversations.isEmpty
               ? _buildEmptyState(isFiltering: _searchQuery.isNotEmpty)
               : _buildConversationList(conversations),
+      ),
     );
   }
 

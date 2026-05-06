@@ -293,6 +293,7 @@ class AdminMissionChatScreen extends StatefulWidget {
               _buildMessageInput(),
             ],
           ),
+      ),
     );
   }
 
