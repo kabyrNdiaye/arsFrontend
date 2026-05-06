@@ -112,7 +112,7 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
                   style: getSourceSerifProStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: _adminPurple,
                   ),
                 ),
         ),

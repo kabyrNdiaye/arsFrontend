@@ -219,7 +219,7 @@ class AdminMissionChatScreen extends StatefulWidget {
                 style: getSourceSerifProStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: _adminPurple,
                 ),
               ),
               if (_allMissions.length > 1)
