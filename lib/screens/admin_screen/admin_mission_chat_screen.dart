@@ -196,20 +196,32 @@ class AdminMissionChatScreen extends StatefulWidget {
         ? (_allMissions.first.structureName ?? 'Mission') 
         : 'Chat';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        backgroundColor: _adminPurple,
-        elevation: 0,
-        toolbarHeight: 85.h,
-        leading: Padding(
-          padding: EdgeInsets.only(top: 10.h),
-          child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
-            onPressed: () => Navigator.pop(context),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: _adminPurple,
+        statusBarIconBrightness: Brightness.light, 
+        statusBarBrightness: Brightness.dark,      
+        systemNavigationBarColor: Colors.white,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F7FB),
+        appBar: AppBar(
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: _adminPurple,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
           ),
-        ),
-        title: Padding(
+          backgroundColor: _adminPurple,
+          elevation: 0,
+          toolbarHeight: 85.h,
+          leading: Padding(
+            padding: EdgeInsets.only(top: 10.h),
+            child: IconButton(
+              icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          title: Padding(
           padding: EdgeInsets.only(top: 10.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

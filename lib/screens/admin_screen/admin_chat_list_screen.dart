@@ -72,13 +72,25 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
       }).toList();
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: _adminPurple,
-        elevation: 0,
-        toolbarHeight: 85.h,
-        leading: Padding(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: _adminPurple,
+        statusBarIconBrightness: Brightness.light, // Android icons
+        statusBarBrightness: Brightness.dark,      // iOS text color (white)
+        systemNavigationBarColor: Colors.white,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        appBar: AppBar(
+          systemOverlayStyle: SystemUiOverlayStyle(
+            statusBarColor: _adminPurple,
+            statusBarIconBrightness: Brightness.light,
+            statusBarBrightness: Brightness.dark,
+          ),
+          backgroundColor: _adminPurple,
+          elevation: 0,
+          toolbarHeight: 85.h,
+          leading: Padding(
           padding: EdgeInsets.only(top: 10.h),
           child: IconButton(
             icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
