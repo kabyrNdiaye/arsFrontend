@@ -720,6 +720,7 @@ class _AdminProfessionnelDetailScreenState
                       builder: (context) => DocumentViewerScreen(
                         title: doc['label']!,
                         url: doc['url']!,
+                        primaryColor: _primaryPurple,
                       ),
                     ),
                   );

@@ -18,11 +18,13 @@ import 'dart:html' as html;
 class DocumentViewerScreen extends StatefulWidget {
   final String title;
   final String url;
+  final Color? primaryColor;
 
   const DocumentViewerScreen({
     Key? key,
     required this.title,
     required this.url,
+    this.primaryColor,
   }) : super(key: key);
 
   @override
@@ -143,7 +145,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: _primaryBlue,
+        backgroundColor: widget.primaryColor ?? _primaryBlue,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -228,7 +230,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
               onPressed: kIsWeb ? _loadWeb : _loadMobile,
               icon: const Icon(Icons.refresh),
               label: const Text('Réessayer'),
-              style: ElevatedButton.styleFrom(backgroundColor: _primaryBlue),
+              style: ElevatedButton.styleFrom(backgroundColor: widget.primaryColor ?? _primaryBlue),
             ),
             SizedBox(height: 8.h),
             TextButton(
@@ -260,8 +262,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             },
             icon: const Icon(Icons.download),
             label: const Text('Ouvrir / Télécharger'),
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryBlue),
+            style: ElevatedButton.styleFrom(backgroundColor: widget.primaryColor ?? _primaryBlue),
           ),
+
         ],
       ),
     );
