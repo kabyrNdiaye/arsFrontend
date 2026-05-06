@@ -199,13 +199,13 @@ class AdminMissionChatScreen extends StatefulWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _adminPurple,
         elevation: 0,
         toolbarHeight: 85.h,
         leading: Padding(
           padding: EdgeInsets.only(top: 10.h),
           child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: _adminPurple, size: 20.sp),
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -219,13 +219,13 @@ class AdminMissionChatScreen extends StatefulWidget {
                 style: getSourceSerifProStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.bold,
-                  color: _adminPurple,
+                  color: Colors.white,
                 ),
               ),
               if (_allMissions.length > 1)
                 Text(
                   "Conversation centralisée (${_allMissions.length} missions)",
-                  style: TextStyle(fontSize: 10.sp, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 10.sp, color: Colors.white70),
                 ),
             ],
           ),
@@ -234,7 +234,7 @@ class AdminMissionChatScreen extends StatefulWidget {
           Padding(
             padding: EdgeInsets.only(top: 10.h),
             child: IconButton(
-              icon: Icon(Icons.refresh, color: Colors.grey[600]),
+              icon: Icon(Icons.refresh, color: Colors.white),
               onPressed: _loadMessages,
             ),
           ),

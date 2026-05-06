@@ -75,13 +75,13 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _adminPurple,
         elevation: 0,
         toolbarHeight: 85.h,
         leading: Padding(
           padding: EdgeInsets.only(top: 10.h),
           child: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: _adminPurple, size: 20.sp),
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20.sp),
             onPressed: () {
               if (_isSearching) {
                 setState(() {
@@ -102,17 +102,17 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
                   autofocus: true,
                   decoration: InputDecoration(
                     hintText: "Rechercher une structure...",
-                    hintStyle: getInterStyle(fontSize: 14.sp, color: Colors.grey[400]),
+                    hintStyle: getInterStyle(fontSize: 14.sp, color: Colors.white70),
                     border: InputBorder.none,
                   ),
-                  style: getInterStyle(fontSize: 15.sp),
+                  style: getInterStyle(fontSize: 15.sp, color: Colors.white),
                 )
               : Text(
                   "Messages des Structures",
                   style: getSourceSerifProStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
-                    color: _adminPurple,
+                    color: Colors.white,
                   ),
                 ),
         ),
@@ -120,7 +120,7 @@ class _AdminChatListScreenState extends State<AdminChatListScreen> {
           Padding(
             padding: EdgeInsets.only(top: 10.h),
             child: IconButton(
-              icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.grey[600]),
+              icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
               onPressed: () {
                 setState(() {
                   if (_isSearching) {
