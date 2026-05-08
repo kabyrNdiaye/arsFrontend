@@ -172,7 +172,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                   ),
                   SizedBox(height: 8.h),
                   Text(
-                    _formatDate(notification.createdAt),
+                    _formatDate(notification.timestamp),
                     style: getSourceSerifProStyle(
                       fontSize: 12.sp,
                       color: Colors.grey[500],
