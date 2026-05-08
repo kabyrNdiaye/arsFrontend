@@ -652,56 +652,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
                           title: 'Régimes spéciaux',
                           icon: Icons.health_and_safety_outlined,
                           children: [
-                            Wrap(
-                              spacing: 8.w,
-                              runSpacing: 8.h,
-                              children: {
-                                'textures': 'Textures modifiées',
-                                'no_salt': 'Sans sel',
-                                'diabetic': 'Diabétique',
-                                'gluten_free': 'Sans gluten',
-                                'vegetarian': 'Végétarien',
-                              }.entries.map((entry) {
-                                final dietKey = entry.key;
-                                final dietLabel = entry.value;
-                                final isSelected =
-                                    _selectedDiets.contains(dietKey) ||
-                                        _selectedDiets.contains(dietLabel);
-                                return FilterChip(
-                                  label: Text(dietLabel,
-                                      style: TextStyle(
-                                        fontSize: 12.sp,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : Colors.black87,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      )),
-                                  selected: isSelected,
-                                  onSelected: (val) {
-                                    setState(() {
-                                      if (val)
-                                        _selectedDiets.add(dietKey);
-                                      else {
-                                        _selectedDiets.remove(dietKey);
-                                        _selectedDiets.remove(dietLabel);
-                                      }
-                                    });
-                                  },
-                                  selectedColor: _primaryPurple,
-                                  checkmarkColor: Colors.white,
-                                  backgroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                        color: isSelected
-                                            ? Colors.transparent
-                                            : Colors.grey[200]!),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                            _buildDietList(),
                           ],
                         ),
                         SizedBox(height: 20.h),

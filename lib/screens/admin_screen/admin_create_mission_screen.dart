@@ -942,35 +942,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
                           title: 'Régimes spéciaux',
                           icon: Icons.health_and_safety_outlined,
                           children: [
-                            Wrap(
-                              spacing: 8.w,
-                              runSpacing: 8.h,
-                              children: {
-                                'textures': 'Textures modifiées',
-                                'no_salt': 'Sans sel',
-                                'diabetic': 'Diabétique',
-                                'gluten_free': 'Sans gluten',
-                                'vegetarian': 'Végétarien',
-                              }.entries.map((entry) {
-                                final dietKey = entry.key;
-                                final dietLabel = entry.value;
-                                final isSelected = _selectedDiets.contains(dietKey);
-                                return FilterChip(
-                                  label: Text(dietLabel, style: getSourceSerifProStyle(fontSize: 12.sp, color: isSelected ? Colors.white : Colors.black87, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                                  selected: isSelected,
-                                  onSelected: (val) {
-                                    setState(() {
-                                      if (val) _selectedDiets.add(dietKey);
-                                      else _selectedDiets.remove(dietKey);
-                                    });
-                                  },
-                                  selectedColor: _primaryPurple,
-                                  checkmarkColor: Colors.white,
-                                  backgroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isSelected ? Colors.transparent : Colors.grey[200]!)),
-                                );
-                              }).toList(),
-                            ),
+                            _buildDietList(),
                           ],
                         ),
                         SizedBox(height: 20.h),
@@ -1458,6 +1430,67 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
     }
+  }
+  Widget _buildDietList() {
+    return Column(
+      children: [
+        _buildDietButton('Textures modifiées', 'textures'),
+        SizedBox(height: 10.h),
+        _buildDietButton('Sans sel', 'no_salt'),
+        SizedBox(height: 10.h),
+        _buildDietButton('Diabétique', 'diabetic'),
+        SizedBox(height: 10.h),
+        _buildDietButton('Sans gluten', 'gluten_free'),
+        SizedBox(height: 10.h),
+        _buildDietButton('Végétarien', 'vegetarian'),
+      ],
+    );
+  }
+
+  Widget _buildDietButton(String label, String value) {
+    final isSelected = _selectedDiets.contains(value);
+    final Color selectedBg = const Color(0xFFEDE7F6);
+    final Color selectedBorder = _primaryPurple;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected)
+            _selectedDiets.remove(value);
+          else
+            _selectedDiets.add(value);
+        });
+      },
+      child: Container(
+        height: 52.h,
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        decoration: BoxDecoration(
+          color: isSelected ? selectedBg : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? selectedBorder : Colors.grey[200]!,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: getSourceSerifProStyle(
+                fontSize: 14.sp,
+                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                color: isSelected ? selectedBorder : Colors.black87,
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_outline,
+                  color: selectedBorder, size: 22.sp),
+          ],
+        ),
+      ),
+    );
   }
 }
 
