@@ -126,7 +126,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
         itemCount: provider.notifications.length,
         itemBuilder: (context, index) {
           final notification = provider.notifications[index];
-          final bool isUnread = notification.readAt == null;
+          final bool isUnread = !notification.isRead;
 
           return Card(
             margin: EdgeInsets.only(bottom: 12.h),
