@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class ApiConfig {
   // URL de base de votre API backend
   static const String _baseUrl =

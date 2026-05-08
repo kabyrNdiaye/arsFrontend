@@ -286,7 +286,7 @@ class _AdminProfessionnelDetailScreenState
                       _buildInfoRow('Email', pro.email ?? ''),
                       _buildInfoRow('Téléphone', pro.telephone ?? '-'),
                       _buildInfoRow('Adresse',
-                          [pro.adresse, pro.ville].where((e) => e != null && e!.isNotEmpty).join(', ') + (pro.codePostal != null ? ' ${pro.codePostal}' : '')),
+                          [pro.adresse, pro.ville].where((e) => e != null && e.isNotEmpty).join(', ') + (pro.codePostal != null ? ' ${pro.codePostal}' : '')),
                     ],
                   ),
                   SizedBox(height: 12.h),
@@ -629,7 +629,7 @@ class _AdminProfessionnelDetailScreenState
     
     if (pro.rawDocuments != null) {
       pro.rawDocuments!.forEach((key, url) {
-        if (url == null || url.toString().isEmpty) return;
+        if (url.toString().isEmpty) return;
         if (key == 'photo_profil_path' || key == 'profileImage') return;
         
         String label = '';

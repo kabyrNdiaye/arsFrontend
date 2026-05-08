@@ -11,9 +11,9 @@ import 'dart:typed_data';
 import '../../utils/font_helper.dart';
 import '../../services/api_service.dart';
 
-// Web uniquement
-import 'dart:ui_web' as ui_web;
-import 'dart:html' as html;
+// Web uniquement (Commenté pour APK Android)
+// import 'dart:ui_web' as ui_web;
+// import 'dart:html' as html;
 
 class DocumentViewerScreen extends StatefulWidget {
   final String title;
@@ -69,42 +69,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     }
   }
 
-  // ─── Web ────────────────────────────────────────────────────────────────
+  // ─── Web (désactivé pour APK mobile) ──────────────────────────────────────
   Future<void> _loadWeb() async {
-    setState(() => _isLoading = true);
-    try {
-      final response = await http.get(Uri.parse(widget.url), headers: _authHeaders);
-      if (response.statusCode == 200) {
-        final mimeType = _isPdf ? 'application/pdf' : 'image/jpeg';
-        final blob = html.Blob([response.bodyBytes], mimeType);
-        final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-        // ignore: undefined_prefixed_name
-        ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
-          if (_isImage) {
-            return html.ImageElement()
-              ..src = blobUrl
-              ..style.width = '100%'
-              ..style.height = '100%'
-              ..style.objectFit = 'contain'
-              ..style.backgroundColor = 'white';
-          } else {
-            // Ajouter #toolbar=0 pour masquer la toolbar Chrome PDF
-            final urlWithNoToolbar = '$blobUrl#toolbar=0&navpanes=0&scrollbar=0';
-            return html.IFrameElement()
-              ..src = urlWithNoToolbar
-              ..style.border = 'none'
-              ..style.width = '100%'
-              ..style.height = '100%'
-              ..style.backgroundColor = 'white';
-          }
-        });
-        if (mounted) setState(() => _isLoading = false);
-      } else {
-        if (mounted) setState(() { _errorMessage = 'Erreur ${response.statusCode}\n${widget.url}'; _isLoading = false; });
-      }
-    } catch (e) {
-      if (mounted) setState(() { _errorMessage = '$e'; _isLoading = false; });
-    }
+    // Code Web désactivé — non compatible Android
+    if (mounted) setState(() => _isLoading = false);
   }
 
   // ─── Mobile ─────────────────────────────────────────────────────────────

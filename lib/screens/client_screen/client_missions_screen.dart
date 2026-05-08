@@ -736,7 +736,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
               ),
               if (hasMenu)
                 Text(
-                  lang.translate(mainRepas!.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
+                  lang.translate(mainRepas.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
                   style: TextStyle(
                     fontSize: 10.sp,
                     fontWeight: FontWeight.bold,
@@ -760,7 +760,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
               ),
             )
           else
-            _buildMenuRowsForMeal(mainRepas!),
+            _buildMenuRowsForMeal(mainRepas),
         ],
       ),
     );

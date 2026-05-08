@@ -504,7 +504,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasFile ? fileName! : title,
+                      hasFile ? fileName : title,
                       style: getSourceSerifProStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.bold,

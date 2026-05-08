@@ -24,8 +24,7 @@ import 'admin_create_mission_screen.dart';
 import 'admin_mission_detail_screen.dart';
 import 'admin_edit_mission_screen.dart';
 import 'admin_mission_chat_screen.dart';
-
-
+import 'admin_notifications_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({Key? key}) : super(key: key);
@@ -350,12 +349,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
                   // Notifications
                   Consumer2<NotificationProvider, MissionProvider>(
                     builder: (context, notifProvider, missionProvider, child) {
-                      // Badge cloche = messages non lus + nouvelles missions non vues
+                      // Badge cloche = messages non lus + nouvelles missions non vues + nouvelles notifications API
                       final totalUnread = missionProvider.totalUnreadMessagesCount +
-                          missionProvider.newMissionsCount;
+                          missionProvider.newMissionsCount +
+                          notifProvider.unreadCount;
                       
                       return GestureDetector(
-                        onTap: null, // La cloche n'ouvre plus de page
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminNotificationsScreen()),
+                          );
+                        },
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -1453,7 +1458,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
               ),
               if (hasMenu)
                 Text(
-                  langProvider.translate(mainRepas!.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
+                  langProvider.translate(mainRepas.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
                   style: TextStyle(
                     fontSize: 9.sp,
                     fontWeight: FontWeight.bold,
@@ -1473,7 +1478,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
               ),
             )
           else
-            _buildMenuRowsForMeal(mainRepas!, langProvider),
+            _buildMenuRowsForMeal(mainRepas, langProvider),
         ],
       ),
     );

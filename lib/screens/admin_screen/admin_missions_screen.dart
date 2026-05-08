@@ -1013,7 +1013,7 @@ class _AdminMissionsScreenState extends State<AdminMissionsScreen> {
               ),
               if (hasMenu)
                 Text(
-                  langProvider.translate(mainRepas!.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
+                  langProvider.translate(mainRepas.typeRepas.toLowerCase().trim().replaceAll(' ', '_')).toUpperCase(),
                   style: TextStyle(
                     fontSize: 9.sp,
                     fontWeight: FontWeight.bold,
@@ -1033,7 +1033,7 @@ class _AdminMissionsScreenState extends State<AdminMissionsScreen> {
               ),
             )
           else
-            _buildMenuRowsForMeal(mainRepas!, langProvider),
+            _buildMenuRowsForMeal(mainRepas, langProvider),
         ],
       ),
     );

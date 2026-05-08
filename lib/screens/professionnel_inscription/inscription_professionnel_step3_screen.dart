@@ -533,7 +533,7 @@ class _InscriptionProfessionnelStep3ScreenState extends State<InscriptionProfess
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              value != null ? lang.translate(value!) : hint,
+              value != null ? lang.translate(value) : hint,
               style: getSourceSerifProStyle(
                 fontSize: 14.sp,
                 color: value != null ? Colors.black87 : Colors.grey[400],

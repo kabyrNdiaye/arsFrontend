@@ -121,14 +121,14 @@ class MissionModel {
       final codePostal = json['structure']['code_postal'] ?? '';
       final ville = json['structure']['ville'] ?? '';
       structAddr = [adresse, codePostal, ville].where((s) => s.toString().isNotEmpty).join(', ');
-      if (structAddr!.isEmpty) structAddr = null;
+      if (structAddr.isEmpty) structAddr = null;
     }
     
     // Fallback: chercher le nom/adresse au niveau supérieur du JSON (pour les missions créées par l'admin)
-    if (structName == null || structName!.isEmpty) {
+    if (structName == null || structName.isEmpty) {
       structName = json['nom_etablissement']?.toString() ?? json['structure_name']?.toString();
     }
-    if (structAddr == null || structAddr!.isEmpty) {
+    if (structAddr == null || structAddr.isEmpty) {
       final adresse = json['adresse']?.toString() ?? '';
       final codePostal = json['code_postal']?.toString() ?? '';
       final ville = json['ville']?.toString() ?? '';
