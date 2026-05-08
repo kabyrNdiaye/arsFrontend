@@ -634,7 +634,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
       {'nom': TextEditingController(), 'quantite': TextEditingController(text: "1"), 'prix': TextEditingController(text: "0")},
     ];
     
-    final List<String> regimeOptions = ['Standard', 'Sans sel', 'Diabétique', 'Végétarien', 'Végétalien', 'Sans gluten', 'Léger'];
+    final List<String> regimeOptions = ['Textures modifiées', 'Sans sel', 'Diabétique', 'Sans gluten', 'Végétarien'];
     final List<String> textureOptions = ['Normal', 'Haché', 'Mixé', 'Mouliné'];
 
     Map<String, TextEditingController> regimeControllers = {
@@ -660,7 +660,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
             children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
               SizedBox(height: 10.h),
-              Text('Nouvelle recette : $typeLabel', style: getSourceSerifProStyle(fontWeight: FontWeight.bold, fontSize: 18.sp)),
+              Text('Nouvelle recette : $typeLabel', style: getSourceSerifProStyle(fontWeight: FontWeight.bold, fontSize: 15.sp)),
               SizedBox(height: 16.h),
               Expanded(
                 child: SingleChildScrollView(

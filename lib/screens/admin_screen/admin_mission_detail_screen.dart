@@ -405,14 +405,11 @@ class _AdminMissionDetailScreenState extends State<AdminMissionDetailScreen> {
       runSpacing: 8.h,
       children: widget.mission.regimesSpeciaux.map((diet) {
         final dietLabels = {
-          'standard': 'Standard',
           'textures': 'Textures modifiées',
           'no_salt': 'Sans sel',
           'diabetic': 'Diabétique',
           'vegetarian': 'Végétarien',
-          'vegan': 'Végétalien',
           'gluten_free': 'Sans gluten',
-          'light': 'Léger'
         };
         String label = dietLabels[diet] ?? diet;
 
@@ -627,7 +624,7 @@ class _AdminMissionDetailScreenState extends State<AdminMissionDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Association de Recette', style: getSourceSerifProStyle(fontSize: 20.sp, fontWeight: FontWeight.bold)),
+            Text('Association de Recette', style: getSourceSerifProStyle(fontSize: 16.sp, fontWeight: FontWeight.bold)),
             SizedBox(height: 8.h),
             Text('Contenu : $suggestion', style: TextStyle(color: _textMuted, fontSize: 13.sp)),
             SizedBox(height: 24.h),

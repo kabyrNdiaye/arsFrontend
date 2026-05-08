@@ -1831,13 +1831,11 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
     ];
 
     final List<String> regimeOptions = [
-      'Standard',
+      'Textures modifiées',
       'Sans sel',
       'Diabétique',
-      'Végétarien',
-      'Végétalien',
       'Sans gluten',
-      'Léger'
+      'Végétarien'
     ];
     final List<String> textureOptions = ['Normal', 'Haché', 'Mixé', 'Mouliné'];
 
@@ -1874,7 +1872,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
               SizedBox(height: 10.h),
               Text('Nouvelle recette : $typeLabel',
                   style: getSourceSerifProStyle(
-                      fontWeight: FontWeight.bold, fontSize: 18.sp)),
+                      fontWeight: FontWeight.bold, fontSize: 15.sp)),
               SizedBox(height: 16.h),
               Expanded(
                 child: SingleChildScrollView(
