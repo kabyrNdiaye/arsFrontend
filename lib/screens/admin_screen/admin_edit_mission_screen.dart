@@ -656,14 +656,11 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
                               spacing: 8.w,
                               runSpacing: 8.h,
                               children: {
-                                'standard': 'Standard',
                                 'textures': 'Textures modifiées',
                                 'no_salt': 'Sans sel',
                                 'diabetic': 'Diabétique',
-                                'vegetarian': 'Végétarien',
-                                'vegan': 'Végétalien',
                                 'gluten_free': 'Sans gluten',
-                                'light': 'Léger'
+                                'vegetarian': 'Végétarien',
                               }.entries.map((entry) {
                                 final dietKey = entry.key;
                                 final dietLabel = entry.value;
@@ -1464,9 +1461,9 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
                   ),
                 ),
                 Text(
-                  'Modification Mission',
+                  'Modification',
                   style: getSourceSerifProStyle(
-                    fontSize: 16.sp,
+                    fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),

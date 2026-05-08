@@ -946,14 +946,11 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
                               spacing: 8.w,
                               runSpacing: 8.h,
                               children: {
-                                'standard': 'Standard',
                                 'textures': 'Textures modifiées',
                                 'no_salt': 'Sans sel',
                                 'diabetic': 'Diabétique',
-                                'vegetarian': 'Végétarien',
-                                'vegan': 'Végétalien',
                                 'gluten_free': 'Sans gluten',
-                                'light': 'Léger'
+                                'vegetarian': 'Végétarien',
                               }.entries.map((entry) {
                                 final dietKey = entry.key;
                                 final dietLabel = entry.value;
