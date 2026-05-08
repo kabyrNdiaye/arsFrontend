@@ -68,40 +68,6 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       );
     }
 
-    if (provider.error != null) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.w),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 48.sp),
-              SizedBox(height: 16.h),
-              Text(
-                'Erreur de chargement',
-                style: getSourceSerifProStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                provider.error!,
-                style: getSourceSerifProStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 24.h),
-              ElevatedButton(
-                onPressed: () => provider.fetchNotifications(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryPurple,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Réessayer', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     if (provider.notifications.isEmpty) {
       return Center(
         child: Column(
