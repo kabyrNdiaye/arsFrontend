@@ -1,0 +1,2 @@
+Running Gradle task 'assembleRelease'...                           24,4s
+Gradle build failed to produce an .apk file. It's likely that this file was generated under C:\Users\LENOVO\Documents\MES PROJETS ENTREPRISES\ITEA_flutter\build, but the tool couldn't find it.

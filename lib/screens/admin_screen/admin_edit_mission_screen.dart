@@ -1466,8 +1466,8 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
                 Text(
                   'Modification Mission',
                   style: getSourceSerifProStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),

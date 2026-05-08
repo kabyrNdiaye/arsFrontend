@@ -107,7 +107,8 @@ class MissionService {
   // Récupérer les statistiques globales (Admin)
   Future<Map<String, dynamic>> getAdminStats() async {
     try {
-      final response = await _apiService.get(ApiConfig.adminStats);
+      final t = DateTime.now().millisecondsSinceEpoch;
+      final response = await _apiService.get('${ApiConfig.adminStats}?t=$t');
       return response['data'] ?? {};
     } catch (e) {
       throw Exception('Erreur lors de la récupération des statistiques: $e');
