@@ -43,10 +43,10 @@ class _AdminCreateRecipeScreenState extends State<AdminCreateRecipeScreen> {
   
   List<Map<String, dynamic>> _ingredients = [];
   Map<String, bool> _regimes = {
-    'Standard': true,
+    'Textures modifiées': false,
     'Sans sel': false,
     'Diabétique': false,
-    'Sans porc': false,
+    'Sans gluten': false,
     'Végétarien': false,
   };
   Map<String, bool> _textures = {
@@ -244,7 +244,7 @@ Widget _buildHeader() {
                 widget.recipeToEdit != null ? 'Modifier la recette' : 'Nouvelle recette',
                 textAlign: TextAlign.center,
                 style: getSourceSerifProStyle(
-                  fontSize: 18.sp,
+                  fontSize: 15.sp,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
