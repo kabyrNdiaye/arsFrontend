@@ -26,6 +26,7 @@ class MissionDetailScreen extends StatefulWidget {
 class _MissionDetailScreenState extends State<MissionDetailScreen> {
   final MissionService _missionService = MissionService();
   bool _isAccepting = false;
+  bool _isCancelling = false;
   final Set<String> _expandedRecipes = {};
   bool _isFinishing = false;
 
@@ -1235,6 +1236,36 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
+            // Bouton Annuler la mission (orange)
+            SizedBox(
+              width: double.infinity,
+              height: 52.h,
+              child: ElevatedButton.icon(
+                onPressed: _isCancelling ? null : () => _showCancellationDialog(langProvider),
+                icon: _isCancelling
+                    ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Icon(Icons.cancel_outlined, size: 20.sp),
+                label: Text(
+                  'Annuler la mission',
+                  style: getInterStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFF6B35),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+
+            SizedBox(height: 12.h),
+
             // Bouton Signaler un incident (rouge)
             SizedBox(
               width: double.infinity,
@@ -1304,6 +1335,206 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         ),
       ),
     );
+  }
+
+  void _showCancellationDialog(LanguageProvider lang) {
+    final TextEditingController motifController = TextEditingController();
+    String? errorText;
+
+    // Calculer si < 24h
+    final bool isLate = widget.mission.horaireMission != null &&
+        widget.mission.horaireMission!.difference(DateTime.now()).inHours < 24;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFFF6B35), size: 40.sp),
+              SizedBox(height: 8.h),
+              Text(
+                'Annuler la mission',
+                style: getInterStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.black87),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Règle 24h
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange[700], size: 18.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'L\'annulation doit être effectuée au moins 24h avant la mission.',
+                          style: getInterStyle(fontSize: 13.sp, color: Colors.orange[900]!, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 12.h),
+
+                // Avertissement bannissement (renforcé si < 24h)
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: isLate ? Color(0xFFFFEBEE) : Color(0xFFFCE4EC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.gavel, color: Colors.red[700], size: 18.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          isLate
+                              ? '⚠️ ANNULATION TARDIVE : Vous annulez à moins de 24h. Cela peut entraîner une suspension ou un bannissement de l\'application.'
+                              : 'Toute annulation sans motif valable ou annulation répétée peut entraîner un bannissement de l\'application.',
+                          style: getInterStyle(
+                            fontSize: 13.sp,
+                            color: Colors.red[800]!,
+                            fontWeight: isLate ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 16.h),
+
+                // Champ motif
+                Text(
+                  'Motif d\'annulation *',
+                  style: getInterStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: Colors.black87),
+                ),
+                SizedBox(height: 8.h),
+                TextField(
+                  controller: motifController,
+                  maxLines: 4,
+                  maxLength: 500,
+                  onChanged: (_) {
+                    if (errorText != null) setDialogState(() => errorText = null);
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Expliquez la raison de l\'annulation (minimum 10 caractères)...',
+                    hintStyle: getInterStyle(fontSize: 12.sp, color: Colors.grey),
+                    errorText: errorText,
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Color(0xFFFF6B35)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            // Bouton retour
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey[400]!),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                ),
+                child: Text('Retour', style: getInterStyle(fontSize: 14.sp, color: Colors.grey[700]!)),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            // Bouton confirmer
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final motif = motifController.text.trim();
+                  if (motif.length < 10) {
+                    setDialogState(() => errorText = 'Le motif doit contenir au moins 10 caractères.');
+                    return;
+                  }
+                  Navigator.pop(context);
+                  _cancelMission(motif, isLate);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[700],
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                ),
+                child: Text(
+                  'Confirmer l\'annulation',
+                  style: getInterStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelMission(String motif, bool isLate) async {
+    setState(() => _isCancelling = true);
+    try {
+      await _missionService.cancelMission(widget.mission.id, motif);
+      if (mounted) {
+        setState(() => _isCancelling = false);
+        // Snackbar avec avertissement renforcé si tardif
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isLate
+                  ? '⚠️ Mission annulée. L\'admin a été notifié. Attention : annulation tardive.'
+                  : 'Mission annulée. L\'administrateur a été notifié.',
+            ),
+            backgroundColor: isLate ? Colors.orange[800] : Colors.green[700],
+            duration: Duration(seconds: 4),
+          ),
+        );
+        Navigator.pop(context, true); // Retour avec refresh
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'annulation : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showIncidentDialog(LanguageProvider lang) {

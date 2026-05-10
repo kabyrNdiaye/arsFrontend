@@ -250,7 +250,7 @@ class SupportTelephoneScreen extends StatelessWidget {
     required String title,
     required String phone,
     required String description,
-    required IconData icon,
+    required FaIconData icon,
     required bool isMain,
   }) {
     return Container(

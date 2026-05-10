@@ -231,5 +231,17 @@ class MissionService {
       throw Exception('Erreur lors de la fin de la mission: $e');
     }
   }
+
+  // Annuler une mission acceptée (professionnel)
+  Future<Map<String, dynamic>> cancelMission(int missionId, String motif) async {
+    try {
+      return await _apiService.post(
+        '${ApiConfig.missions}/$missionId/cancel',
+        {'motif': motif},
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de l\'annulation de la mission: $e');
+    }
+  }
 }
 

@@ -229,7 +229,7 @@ class SupportEmailScreen extends StatelessWidget {
     required String title,
     required String email,
     required String description,
-    required IconData icon,
+    required FaIconData icon,
   }) {
     return Container(
       padding: EdgeInsets.all(16.w),

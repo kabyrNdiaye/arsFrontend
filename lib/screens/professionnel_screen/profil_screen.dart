@@ -132,7 +132,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final docProvider = Provider.of<DocumentProvider>(context, listen: false);
     
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
         withData: kIsWeb,

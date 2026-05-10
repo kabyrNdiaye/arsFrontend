@@ -45,7 +45,6 @@ dependencies:
   connectivity_plus: ^7.1.1
 
 dependency_overrides:
-  record_platform_interface: 1.1.0
 
 dev_dependencies:
   flutter_test:

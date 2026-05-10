@@ -35,7 +35,7 @@ class _InscriptionClientStep2ScreenState extends State<InscriptionClientStep2Scr
 
   Future<void> _pickPhoto() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.image,
         allowMultiple: false,
       );

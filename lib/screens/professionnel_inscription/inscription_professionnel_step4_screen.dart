@@ -734,7 +734,7 @@ class _InscriptionProfessionnelStep4ScreenState extends State<InscriptionProfess
 
   Future<void> _pickFile(String type) async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: type == 'photo' 
             ? ['jpg', 'jpeg', 'png'] 

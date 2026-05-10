@@ -160,7 +160,7 @@ class ClientAideSupportScreen extends StatelessWidget {
 
   Widget _buildSupportCard({
     required BuildContext context,
-    required IconData icon,
+    required FaIconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,

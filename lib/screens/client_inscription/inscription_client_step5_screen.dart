@@ -34,7 +34,7 @@ class _InscriptionClientStep5ScreenState extends State<InscriptionClientStep5Scr
 
   Future<void> _pickDocument(String type) async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
       );

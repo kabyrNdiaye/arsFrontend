@@ -46,7 +46,7 @@ class _ClientProfilScreenState extends State<ClientProfilScreen> {
   // Fonction pour ajouter un document
   Future<void> _ajouterDocument() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
       );
