@@ -140,6 +140,22 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
               child: Row(
                 children: [
                   IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.fileName,
+                      style: getSourceSerifProStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.open_in_new, color: Colors.white),
                     tooltip: 'Ouvrir dans un nouvel onglet',
                     onPressed: () async {
