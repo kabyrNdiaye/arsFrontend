@@ -11,9 +11,7 @@ import 'dart:typed_data';
 import '../../utils/font_helper.dart';
 import '../../services/api_service.dart';
 
-// Web uniquement (Commenté pour APK Android)
-// import 'dart:ui_web' as ui_web;
-// import 'dart:html' as html;
+import 'web_view_stub.dart' if (dart.library.html) 'web_view_web.dart';
 
 class DocumentViewerScreen extends StatefulWidget {
   final String title;
@@ -40,14 +38,21 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   String? _localPdfPath;
   Uint8List? _imageBytes;
 
-  bool get _isPdf => widget.url.toLowerCase().contains('.pdf');
+  bool _isPdfResource = false;
+  bool _isImageResource = false;
+  bool _isWordResource = false;
+
+  bool get _isPdf => widget.url.toLowerCase().contains('.pdf') || _isPdfResource;
   bool get _isWord =>
       widget.url.toLowerCase().contains('.doc') ||
-      widget.url.toLowerCase().contains('.docx');
+      widget.url.toLowerCase().contains('.docx') ||
+      _isWordResource;
   bool get _isImage {
     final u = widget.url.toLowerCase();
     return u.endsWith('.jpg') || u.endsWith('.jpeg') ||
-        u.endsWith('.png') || u.endsWith('.webp') || u.endsWith('.avif');
+        u.endsWith('.png') || u.endsWith('.webp') || u.endsWith('.avif') ||
+        u.contains('.jpg?') || u.contains('.png?') ||
+        _isImageResource;
   }
 
   Map<String, String> get _authHeaders {
@@ -71,8 +76,12 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   // ─── Web (désactivé pour APK mobile) ──────────────────────────────────────
   Future<void> _loadWeb() async {
-    // Code Web désactivé — non compatible Android
-    if (mounted) setState(() => _isLoading = false);
+    try {
+      WebViewHelper.registerView(_viewType, widget.url);
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      if (mounted) setState(() { _errorMessage = 'Erreur Web: $e'; _isLoading = false; });
+    }
   }
 
   // ─── Mobile ─────────────────────────────────────────────────────────────
@@ -85,14 +94,24 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         return;
       }
 
+      // Détection du type par les headers si possible
+      final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+      _isPdfResource = contentType.contains('pdf');
+      _isImageResource = contentType.contains('image');
+      _isWordResource = contentType.contains('msword') || contentType.contains('officedocument');
+
       if (_isPdf) {
         final dir = await getTemporaryDirectory();
         final rawName = widget.url.split('/').last.split('?').first;
-        final fileName = rawName.isNotEmpty ? rawName : '${widget.title}.pdf';
+        final fileName = rawName.contains('.') ? rawName : '${widget.title}.pdf';
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
         if (mounted) setState(() { _localPdfPath = file.path; _isLoading = false; });
+      } else if (_isImage) {
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
       } else {
+        // Si type inconnu mais on a des bytes, on tente de l'afficher comme image par défaut 
+        // ou on propose le téléchargement
         if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
       }
     } catch (e) {
