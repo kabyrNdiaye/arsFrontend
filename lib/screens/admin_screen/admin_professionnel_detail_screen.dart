@@ -633,7 +633,12 @@ class _AdminProfessionnelDetailScreenState
         if (key == 'photo_profil_path' || key == 'profileImage') return;
         
         String label = '';
-        if (key.contains('diplome')) {
+        final String lowKey = key.toLowerCase();
+        
+        // Si c'est déjà un "beau nom" (commence par Majuscule et pas de _path)
+        if (key.isNotEmpty && key[0] == key[0].toUpperCase() && !key.contains('_path')) {
+          label = key;
+        } else if (lowKey.contains('diplome')) {
           label = 'Diplôme';
           final RegExp regex = RegExp(r'_(\d+)$');
           final match = regex.firstMatch(key);
@@ -641,19 +646,21 @@ class _AdminProfessionnelDetailScreenState
             int index = int.parse(match.group(1)!) + 1;
             label = 'Diplôme $index';
           }
-        } else if (key.contains('medical')) {
+        } else if (lowKey.contains('medical')) {
           label = 'Certificat médical';
-        } else if (key.contains('permis')) {
+        } else if (lowKey.contains('permis')) {
           label = 'Permis de conduire';
-        } else if (key.contains('contrat')) {
+        } else if (lowKey.contains('contrat')) {
           label = 'Contrat de prestation';
-        } else if (key.contains('plan_locaux')) {
+        } else if (lowKey.contains('plan_locaux')) {
           label = 'Plan des locaux';
-        } else if (key.contains('reglement_interieur')) {
+        } else if (lowKey.contains('reglement_interieur')) {
           label = 'Règlement intérieur';
         } else {
           label = key.replaceAll('_path', '').replaceAll('_', ' ');
-          label = label[0].toUpperCase() + label.substring(1);
+          if (label.isNotEmpty) {
+            label = label[0].toUpperCase() + label.substring(1);
+          }
         }
 
         docs.add({'label': label, 'url': url.toString()});

@@ -179,6 +179,36 @@ class User {
       stats: json['stats'],
       rawDocuments: _extractAllDocuments(json),
     );
+
+    // Peupler les champs nommés depuis rawDocuments si vides
+    final docs = pro.rawDocuments ?? {};
+    return pro.copyWith(
+      diplomePath: pro.diplomePath ?? _findDoc(docs, ['diplome']),
+      certificatMedical: pro.certificatMedical ?? _findDoc(docs, ['medical']),
+      permiConduire: pro.permiConduire ?? _findDoc(docs, ['permis']),
+      contratPrestation: pro.contratPrestation ?? _findDoc(docs, ['contrat']),
+      planLocaux: pro.planLocaux ?? _findDoc(docs, ['plan_locaux']),
+      reglementInterieur: pro.reglementInterieur ?? _findDoc(docs, ['reglement']),
+    );
+  }
+
+  static String? _findDoc(Map<String, String> docs, List<String> targets) {
+    String normalize(String s) {
+      return s.toLowerCase()
+          .replaceAll('é', 'e').replaceAll('è', 'e').replaceAll('ê', 'e')
+          .replaceAll('à', 'a').replaceAll('â', 'a')
+          .replaceAll('î', 'i').replaceAll('ï', 'i')
+          .replaceAll('ô', 'o').replaceAll('û', 'u')
+          .replaceAll('ç', 'c');
+    }
+
+    for (var k in docs.keys) {
+      final nk = normalize(k);
+      for (var t in targets) {
+        if (nk.contains(normalize(t))) return docs[k];
+      }
+    }
+    return null;
   }
 
   static void debugLog(String msg) {

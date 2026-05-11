@@ -459,12 +459,43 @@ class _AdminStructureDetailScreenState
   Widget _buildDocumentsSection(User struct) {
     final docs = <Map<String, String>>[];
 
-    if (struct.contratPrestation != null && struct.contratPrestation!.isNotEmpty)
-      docs.add({'label': 'Contrat prestation', 'url': struct.contratPrestation!});
-    if (struct.planLocaux != null && struct.planLocaux!.isNotEmpty)
-      docs.add({'label': 'Plan des locaux', 'url': struct.planLocaux!});
-    if (struct.reglementInterieur != null && struct.reglementInterieur!.isNotEmpty)
-      docs.add({'label': 'Règlement intérieur', 'url': struct.reglementInterieur!});
+    if (struct.rawDocuments != null) {
+      struct.rawDocuments!.forEach((key, url) {
+        if (url.toString().isEmpty) return;
+        if (key == 'photo_profil_path' || key == 'profileImage') return;
+
+        String label = '';
+        final String lowKey = key.toLowerCase();
+
+        // Si c'est déjà un "beau nom"
+        if (key.isNotEmpty && key[0] == key[0].toUpperCase() && !key.contains('_path')) {
+          label = key;
+        } else if (lowKey.contains('contrat')) {
+          label = 'Contrat de prestation';
+        } else if (lowKey.contains('plan_locaux')) {
+          label = 'Plan des locaux';
+        } else if (lowKey.contains('reglement_interieur')) {
+          label = 'Règlement intérieur';
+        } else {
+          label = key.replaceAll('_path', '').replaceAll('_', ' ');
+          if (label.isNotEmpty) {
+            label = label[0].toUpperCase() + label.substring(1);
+          }
+        }
+
+        docs.add({'label': label, 'url': url.toString()});
+      });
+      docs.sort((a, b) => a['label']!.compareTo(b['label']!));
+    }
+
+    if (docs.isEmpty) {
+      if (struct.contratPrestation != null && struct.contratPrestation!.isNotEmpty)
+        docs.add({'label': 'Contrat prestation', 'url': struct.contratPrestation!});
+      if (struct.planLocaux != null && struct.planLocaux!.isNotEmpty)
+        docs.add({'label': 'Plan des locaux', 'url': struct.planLocaux!});
+      if (struct.reglementInterieur != null && struct.reglementInterieur!.isNotEmpty)
+        docs.add({'label': 'Règlement intérieur', 'url': struct.reglementInterieur!});
+    }
 
     if (docs.isEmpty) {
       return Container(
