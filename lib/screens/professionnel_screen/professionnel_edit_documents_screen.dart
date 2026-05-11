@@ -489,12 +489,17 @@ class _ProfessionnelEditDocumentsScreenState
               if (hasUrl)
                 IconButton(
                   onPressed: () {
+                    final String ext = doc.url.split('.').last.toLowerCase();
+                    final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png') ? 'image' : 'pdf';
+                    
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => FilePreviewScreen(
                           fileUrl: doc.url,
                           fileName: doc.displayName,
+                          fileType: fileType,
+                          authToken: Provider.of<AuthProvider>(context, listen: false).token,
                         ),
                       ),
                     );
