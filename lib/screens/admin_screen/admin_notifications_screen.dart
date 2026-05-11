@@ -29,46 +29,65 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     ScreenUtil.init(context, designSize: const Size(375, 812));
     final notificationProvider = Provider.of<NotificationProvider>(context);
 
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: Column(
+        children: [
+          _buildHeader(context, notificationProvider),
+          Expanded(
+            child: _buildBody(notificationProvider),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, NotificationProvider provider) {
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+    // On force une hauteur minimum si statusBarHeight est nulle (ex: web)
+    final double safeTop = statusBarHeight > 0 ? statusBarHeight : 24.h;
+
     return Container(
+      width: double.infinity,
       color: _primaryPurple,
-      child: SafeArea(
-        bottom: false, // Ne pas affecter le bas de l'écran
-        child: Scaffold(
-          backgroundColor: Colors.grey[50],
-          appBar: AppBar(
-            title: Padding(
-              padding: EdgeInsets.only(top: 8.h),
-              child: Text(
+      padding: EdgeInsets.only(
+        top: safeTop + 16.h, // Pousse le texte 16.h sous la barre de statut
+        bottom: 20.h,        // Fait descendre le fond violet de 20.h sous le texte
+        left: 4.w,
+        right: 4.w,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              SizedBox(width: 8.w),
+              Text(
                 'Notifications',
                 style: getSourceSerifProStyle(
-                  fontSize: 20.sp,
+                  fontSize: 22.sp, // Légèrement plus grand
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-            ),
-            backgroundColor: _primaryPurple,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
-            actions: [
-              if (notificationProvider.unreadCount > 0)
-                Padding(
-                  padding: EdgeInsets.only(top: 8.h, right: 8.w),
-                  child: IconButton(
-                    icon: const Icon(Icons.done_all),
-                    tooltip: 'Tout marquer comme lu',
-                    onPressed: () {
-                      notificationProvider.markAllAsRead();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Toutes les notifications ont été marquées comme lues')),
-                      );
-                    },
-                  ),
-                ),
             ],
           ),
-          body: _buildBody(notificationProvider),
-        ),
+          if (provider.unreadCount > 0)
+            IconButton(
+              icon: const Icon(Icons.done_all, color: Colors.white),
+              tooltip: 'Tout marquer comme lu',
+              onPressed: () {
+                provider.markAllAsRead();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Toutes les notifications ont été marquées comme lues')),
+                );
+              },
+            ),
+        ],
       ),
     );
   }
