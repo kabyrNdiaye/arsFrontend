@@ -369,26 +369,6 @@ class _ProfessionnelEditDocumentsScreenState
     );
   }
 
-        SizedBox(height: 20.h),
-
-        // Bouton Ajouter
-        ElevatedButton.icon(
-          onPressed: _isLoadingDocs ? null : _addDocument,
-          icon: const Icon(Icons.add_circle_outline),
-          label: const Text('Ajouter un document'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: _primaryBlue,
-            side: const BorderSide(color: _primaryBlue),
-            padding: EdgeInsets.symmetric(vertical: 14.h),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-        SizedBox(height: 40.h),
-      ],
-    );
-  }
-
   Widget _buildDocTile(DocumentItem doc) {
     final pending = _pendingFiles[doc.id];
     final hasPending = pending != null;
