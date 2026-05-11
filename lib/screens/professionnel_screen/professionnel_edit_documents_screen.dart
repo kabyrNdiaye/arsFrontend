@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import '../shared/file_preview_screen.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
@@ -41,8 +42,41 @@ class _ProfessionnelEditDocumentsScreenState
       _loadError = null;
     });
     try {
-      final docs = await _docService.getMyDocuments();
-      if (mounted) setState(() => _documents = docs);
+      final apiDocs = await _docService.getMyDocuments();
+      
+      // Dossier virtuel : On s'assure d'avoir les 3 documents obligatoires
+      final List<DocumentItem> dossiers = [];
+      
+      // 1. Curriculum Vitae(CV)
+      final cv = apiDocs.firstWhere(
+        (d) => d.nom.contains('Curriculum') || d.nom == 'cv_path',
+        orElse: () => DocumentItem(id: -1, nom: 'Curriculum Vitae(CV)', url: '', statut: 'manquant')
+      );
+      dossiers.add(cv);
+
+      // 2. Carte d'identité
+      final idCard = apiDocs.firstWhere(
+        (d) => d.nom.contains('identité') || d.nom == 'identite_path',
+        orElse: () => DocumentItem(id: -2, nom: 'Carte d\'identité', url: '', statut: 'manquant')
+      );
+      dossiers.add(idCard);
+
+      // 3. Diplôme de cuisine
+      final diplome = apiDocs.firstWhere(
+        (d) => d.nom.contains('Diplôme') || d.nom == 'diplome_path',
+        orElse: () => DocumentItem(id: -3, nom: 'Diplôme de cuisine', url: '', statut: 'manquant')
+      );
+      dossiers.add(diplome);
+
+      // 4. Documents additionnels (tout le reste)
+      final additions = apiDocs.where((d) => 
+        !d.nom.contains('Curriculum') && d.nom != 'cv_path' &&
+        !d.nom.contains('identité') && d.nom != 'identite_path' &&
+        !d.nom.contains('Diplôme') && d.nom != 'diplome_path'
+      ).toList();
+      dossiers.addAll(additions);
+
+      if (mounted) setState(() => _documents = dossiers);
     } catch (e) {
       if (mounted) setState(() => _loadError = e.toString());
     } finally {
@@ -172,12 +206,28 @@ class _ProfessionnelEditDocumentsScreenState
       final PlatformFile file = entry.value;
 
       try {
-        await _docService.updateDocument(
-          id: docId,
-          filePath: kIsWeb ? null : file.path,
-          fileBytes: kIsWeb ? file.bytes : null,
-          fileName: file.name,
-        );
+        if (docId < 0) {
+          // Upload initial pour un document fixe manquant
+          String fixName = '';
+          if (docId == -1) fixName = 'Curriculum Vitae(CV)';
+          else if (docId == -2) fixName = 'Carte d\'identité';
+          else if (docId == -3) fixName = 'Diplôme de cuisine';
+
+          await _docService.addDocument(
+            nom: fixName,
+            filePath: kIsWeb ? null : file.path,
+            fileBytes: kIsWeb ? file.bytes : null,
+            fileName: file.name,
+          );
+        } else {
+          // Mise à jour (remplacement) d'un document existant
+          await _docService.updateDocument(
+            id: docId,
+            filePath: kIsWeb ? null : file.path,
+            fileBytes: kIsWeb ? file.bytes : null,
+            fileName: file.name,
+          );
+        }
         success++;
       } catch (e) {
         errors.add(e.toString());
@@ -372,6 +422,8 @@ class _ProfessionnelEditDocumentsScreenState
   Widget _buildDocTile(DocumentItem doc) {
     final pending = _pendingFiles[doc.id];
     final hasPending = pending != null;
+    final isMissing = doc.id < 0;
+    final hasUrl = doc.url.isNotEmpty && doc.url != 'null';
 
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -380,7 +432,7 @@ class _ProfessionnelEditDocumentsScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasPending ? _primaryBlue : Colors.grey[200]!,
+          color: hasPending ? _primaryBlue : (isMissing ? Colors.orange[200]! : Colors.grey[200]!),
           width: hasPending ? 2 : 1,
         ),
         boxShadow: [
@@ -400,12 +452,12 @@ class _ProfessionnelEditDocumentsScreenState
               Container(
                 padding: EdgeInsets.all(8.w),
                 decoration: BoxDecoration(
-                  color: _primaryBlue.withOpacity(0.1),
+                  color: (isMissing ? Colors.orange : _primaryBlue).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   doc.isFixed ? Icons.verified_user_outlined : Icons.description_outlined,
-                  color: _primaryBlue,
+                  color: isMissing ? Colors.orange[800] : _primaryBlue,
                   size: 20.sp,
                 ),
               ),
@@ -424,12 +476,31 @@ class _ProfessionnelEditDocumentsScreenState
                     ),
                     if (doc.isFixed)
                       Text(
-                        'Document obligatoire',
-                        style: getSourceSerifProStyle(fontSize: 11.sp, color: Colors.orange[800]),
+                        isMissing ? 'À fournir (obligatoire)' : 'Document obligatoire',
+                        style: getSourceSerifProStyle(
+                          fontSize: 11.sp, 
+                          color: isMissing ? Colors.red[700] : Colors.orange[800],
+                          fontWeight: isMissing ? FontWeight.bold : FontWeight.normal
+                        ),
                       ),
                   ],
                 ),
               ),
+              if (hasUrl)
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FilePreviewScreen(
+                          fileUrl: doc.url,
+                          fileName: doc.displayName,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility_outlined, color: _primaryBlue),
+                ),
               if (!doc.isFixed)
                 IconButton(
                   onPressed: () => _deleteDocument(doc.id, doc.displayName),
