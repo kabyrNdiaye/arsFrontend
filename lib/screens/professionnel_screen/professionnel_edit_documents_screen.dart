@@ -52,7 +52,7 @@ class _ProfessionnelEditDocumentsScreenState
 
   Future<void> _pickFile(int docId) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
         withData: kIsWeb,
@@ -74,7 +74,7 @@ class _ProfessionnelEditDocumentsScreenState
 
   Future<void> _addDocument() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
         withData: kIsWeb,
