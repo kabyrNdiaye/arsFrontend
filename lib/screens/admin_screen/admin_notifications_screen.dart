@@ -29,35 +29,47 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     ScreenUtil.init(context, designSize: const Size(375, 812));
     final notificationProvider = Provider.of<NotificationProvider>(context);
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'Notifications',
-          style: getSourceSerifProStyle(
-            fontSize: 20.sp,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: _primaryPurple,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          if (notificationProvider.unreadCount > 0)
-            IconButton(
-              icon: const Icon(Icons.done_all),
-              tooltip: 'Tout marquer comme lu',
-              onPressed: () {
-                notificationProvider.markAllAsRead();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Toutes les notifications ont été marquées comme lues')),
-                );
-              },
+    return Container(
+      color: _primaryPurple,
+      child: SafeArea(
+        bottom: false, // Ne pas affecter le bas de l'écran
+        child: Scaffold(
+          backgroundColor: Colors.grey[50],
+          appBar: AppBar(
+            title: Padding(
+              padding: EdgeInsets.only(top: 8.h),
+              child: Text(
+                'Notifications',
+                style: getSourceSerifProStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
-        ],
+            backgroundColor: _primaryPurple,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
+            actions: [
+              if (notificationProvider.unreadCount > 0)
+                Padding(
+                  padding: EdgeInsets.only(top: 8.h, right: 8.w),
+                  child: IconButton(
+                    icon: const Icon(Icons.done_all),
+                    tooltip: 'Tout marquer comme lu',
+                    onPressed: () {
+                      notificationProvider.markAllAsRead();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Toutes les notifications ont été marquées comme lues')),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+          body: _buildBody(notificationProvider),
+        ),
       ),
-      body: _buildBody(notificationProvider),
     );
   }
 
