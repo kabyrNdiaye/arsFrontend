@@ -118,7 +118,7 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
         if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
       } else {
         // Autre ou inconnu -> on tente en image si on a des bytes
-        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isImageResource = true; _isLoading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _errorMessage = '$e'; _isLoading = false; });

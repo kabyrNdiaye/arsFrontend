@@ -108,10 +108,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         await file.writeAsBytes(response.bodyBytes);
         if (mounted) setState(() { _localPdfPath = file.path; _isLoading = false; });
       } else if (_isImage) {
-        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isImageResource = true; _isLoading = false; });
       } else {
         // Tentative progressive : si on a des bytes, on considère que c'est affichable
-        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isImageResource = true; _isLoading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _errorMessage = '$e'; _isLoading = false; });
