@@ -108,11 +108,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         await file.writeAsBytes(response.bodyBytes);
         if (mounted) setState(() { _localPdfPath = file.path; _isLoading = false; });
       } else if (_isImage) {
-        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
       } else {
-        // Si type inconnu mais on a des bytes, on tente de l'afficher comme image par défaut 
-        // ou on propose le téléchargement
-        if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
+        // Tentative progressive : si on a des bytes, on considère que c'est affichable
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _errorMessage = '$e'; _isLoading = false; });
@@ -138,7 +137,15 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        // Aucune action = aucune icône
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_new, color: Colors.white),
+            tooltip: 'Ouvrir dans un nouvel onglet',
+            onPressed: () async {
+              await launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication);
+            },
+          ),
+        ],
       ),
       body: _buildBody(),
     );
@@ -149,6 +156,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     if (kIsWeb) {
       if (_isLoading) return const Center(child: CircularProgressIndicator());
       if (_errorMessage != null) return _buildError();
+      
+      // Sur Web, on favorise l'affichage direct si c'est une image connue
+      if (_isImage) {
+        return PhotoView(
+          imageProvider: NetworkImage(widget.url),
+          minScale: PhotoViewComputedScale.contained,
+          maxScale: PhotoViewComputedScale.covered * 2,
+        );
+      }
+      
       return SizedBox.expand(child: HtmlElementView(viewType: _viewType));
     }
 
