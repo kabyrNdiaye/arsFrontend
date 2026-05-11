@@ -11,7 +11,7 @@ import 'dart:typed_data';
 import '../../utils/font_helper.dart';
 import '../../services/api_service.dart';
 
-import 'web_view_stub.dart' if (dart.library.html) 'web_view_web.dart';
+import '../shared/web_view_stub.dart' if (dart.library.html) '../shared/web_view_web.dart';
 
 class DocumentViewerScreen extends StatefulWidget {
   final String title;
