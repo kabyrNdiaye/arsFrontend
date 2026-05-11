@@ -30,17 +30,26 @@ class DocumentItem {
   /// Nom d'affichage lisible (traduit les clés techniques)
   String get displayName {
     switch (nom) {
-      case 'diplome_path':        return 'Diplôme de cuisine';
-      case 'certificat_medical_path': return 'Certificat médical';
-      case 'permis_conduire_path': return 'Permis de conduire';
-      default:                    return nom;
+      case 'diplome_path':
+      case 'Diplôme de cuisine':     return 'Diplôme de cuisine';
+      case 'certificat_medical_path':
+      case 'Certificat médical':     return 'Certificat médical';
+      case 'permis_conduire_path':
+      case 'Permis de conduire':    return 'Permis de conduire';
+      case 'cv_path':
+      case 'Curriculum Vitae(CV)':   return 'Curriculum Vitae(CV)';
+      case 'identite_path':
+      case 'Carte d\'identité':      return 'Carte d\'identité';
+      default:                       return nom;
     }
   }
 
   bool get isFixed =>
-      nom == 'diplome_path' ||
-      nom == 'certificat_medical_path' ||
-      nom == 'permis_conduire_path';
+      nom == 'diplome_path' || nom == 'Diplôme de cuisine' ||
+      nom == 'certificat_medical_path' || nom == 'Certificat médical' ||
+      nom == 'permis_conduire_path' || nom == 'Permis de conduire' ||
+      nom == 'cv_path' || nom == 'Curriculum Vitae(CV)' ||
+      nom == 'identite_path' || nom == 'Carte d\'identité';
 }
 
 class DocumentService {

@@ -52,7 +52,7 @@ class _ProfessionnelEditDocumentsScreenState
 
   Future<void> _pickFile(int docId) async {
     try {
-      final result = await FilePicker.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
         withData: kIsWeb,
@@ -63,10 +63,90 @@ class _ProfessionnelEditDocumentsScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Impossible de sélectionner le fichier. Vérifiez les permissions.'),
+          const SnackBar(
+            content: Text('Impossible de sélectionner le fichier.'),
             backgroundColor: Colors.red,
           ),
+        );
+      }
+    }
+  }
+
+  Future<void> _addDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+        withData: kIsWeb,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        setState(() => _isLoadingDocs = true);
+
+        await _docService.addDocument(
+          nom: file.name, // Nom automatique selon le fichier
+          filePath: kIsWeb ? null : file.path,
+          fileBytes: kIsWeb ? file.bytes : null,
+          fileName: file.name,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Document ajouté avec succès ✓'),
+              backgroundColor: Color(0xFF4CAF50),
+            ),
+          );
+          _loadDocuments();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingDocs = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDocument(int docId, String name) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer ?'),
+        content: Text('Voulez-vous vraiment supprimer "$name" ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ANNULER')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('SUPPRIMER'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoadingDocs = true);
+    try {
+      await _docService.deleteDocument(docId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Document supprimé')),
+        );
+        _loadDocuments();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingDocs = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -266,6 +346,23 @@ class _ProfessionnelEditDocumentsScreenState
 
         // Liste des documents
         ..._documents.map((doc) => _buildDocTile(doc)),
+
+        SizedBox(height: 20.h),
+
+        // Bouton Ajouter
+        ElevatedButton.icon(
+          onPressed: _isLoadingDocs ? null : _addDocument,
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text('Ajouter un document'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: _primaryBlue,
+            side: const BorderSide(color: _primaryBlue),
+            padding: EdgeInsets.symmetric(vertical: 14.h),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        SizedBox(height: 40.h),
       ],
     );
   }
@@ -305,7 +402,7 @@ class _ProfessionnelEditDocumentsScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  doc.isFixed ? Icons.description_outlined : Icons.attach_file,
+                  doc.isFixed ? Icons.verified_user_outlined : Icons.description_outlined,
                   color: _primaryBlue,
                   size: 20.sp,
                 ),
@@ -323,9 +420,21 @@ class _ProfessionnelEditDocumentsScreenState
                         color: Colors.black87,
                       ),
                     ),
+                    if (doc.isFixed)
+                      Text(
+                        'Document obligatoire',
+                        style: getSourceSerifProStyle(fontSize: 11.sp, color: Colors.orange[800]),
+                      ),
                   ],
                 ),
               ),
+              if (!doc.isFixed)
+                IconButton(
+                  onPressed: () => _deleteDocument(doc.id, doc.displayName),
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
             ],
           ),
 

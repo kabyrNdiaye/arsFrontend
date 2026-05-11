@@ -630,21 +630,25 @@ class _AdminProfessionnelDetailScreenState
     if (pro.rawDocuments != null) {
       pro.rawDocuments!.forEach((key, url) {
         if (url.toString().isEmpty) return;
-        if (key == 'photo_profil_path' || key == 'profileImage') return;
+        if (key == 'photo_profil_path' || key == 'profileImage' || key == 'photo_profil') return;
         
         String label = '';
         final String lowKey = key.toLowerCase();
         
-        // Si c'est déjà un "beau nom" (commence par Majuscule et pas de _path)
+        // Priorité aux noms déjà formattés (ex: "Curriculum Vitae(CV)")
         if (key.isNotEmpty && key[0] == key[0].toUpperCase() && !key.contains('_path')) {
           label = key;
+        } else if (lowKey == 'cv_path' || lowKey == 'cv' || key.contains('Curriculum')) {
+          label = 'Curriculum Vitae(CV)';
+        } else if (lowKey == 'identite_path' || lowKey == 'carte_identite' || key.contains('identité')) {
+          label = 'Carte d\'identité';
         } else if (lowKey.contains('diplome')) {
-          label = 'Diplôme';
+          label = 'Diplôme de cuisine';
           final RegExp regex = RegExp(r'_(\d+)$');
           final match = regex.firstMatch(key);
           if (match != null) {
             int index = int.parse(match.group(1)!) + 1;
-            label = 'Diplôme $index';
+            label = 'Diplôme de cuisine $index';
           }
         } else if (lowKey.contains('medical')) {
           label = 'Certificat médical';

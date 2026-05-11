@@ -54,7 +54,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
       return url.split('/').last.split('?').first.toLowerCase();
     }
 
-    // Helper : ajoute un doc seulement s'il n'est pas déjà présent (par URL ou nom de fichier)
+    // Helper : ajoute un doc seulement s'il n'est pas déjà présent
     void addIfNew(String title, String? url) {
       if (url == null || url.isEmpty) return;
       final fileName = _fileNameFromUrl(url);
@@ -68,61 +68,27 @@ class _ProfilScreenState extends State<ProfilScreen> {
       }
     }
 
-    // 1. Documents fixes du profil (diplôme, certificat, permis)
-    addIfNew(langProvider.translate('cook_diploma'), user?.diplomePath);
-    addIfNew(langProvider.translate('medical_cert'), user?.certificatMedical);
-    addIfNew(langProvider.translate('driving_license'), user?.permiConduire);
-
-    // 2. Documents dynamiques du rawDocuments
-    if (user?.rawDocuments != null) {
-      // Clés à ignorer car déjà gérées ci-dessus (on les ajoute via diplomePath etc.)
-      const skipKeys = {
-        'photo_profil_path', 'profileImage', 'photo_profil',
-      };
-      user!.rawDocuments!.forEach((key, url) {
-        if (skipKeys.contains(key)) return;
-        if (key.toLowerCase().contains('photo') || key.toLowerCase().contains('profil')) return;
-
-        // Construire un label lisible
-        String label = key
-            .replaceAll('_path', '')
-            .replaceAll(RegExp(r'_\d+$'), '')
-            .replaceAll('_', ' ')
-            .trim();
-
-        // Traduire les labels connus
-        if (label == 'diplome') label = langProvider.translate('cook_diploma') ?? 'Diplôme';
-        else if (label == 'certificat medical') label = langProvider.translate('medical_cert') ?? 'Certificat médical';
-        else if (label == 'permis conduire') label = langProvider.translate('driving_license') ?? 'Permis de conduire';
-        else if (label.isNotEmpty) label = label[0].toUpperCase() + label.substring(1);
-
-        addIfNew(label, url);
-      });
-    }
-
-    // 3. Documents uploadés via DocumentProvider (session courante ou API /documents)
+    // charger les documents depuis le Provider (qui contient les vrais DocumentItem)
     final docProvider = Provider.of<DocumentProvider>(context);
-    for (final doc in docProvider.documents) {
-      final String? rawUrl = doc['fichier_url'] ?? doc['url'] ?? doc['fichier'];
-      final String? url = User.sanitizeUrl(rawUrl);
-      final String title = doc['nom'] ?? doc['type'] ?? doc['title'] ?? 'Document';
-      // Exclure les photos de profil
-      if (url != null) {
-        final ext = url.split('.').last.toLowerCase().split('?').first;
-        if (ext == 'avif' || ext == 'webp') continue;
-        if (title.toLowerCase().contains('photo') ||
-            title.toLowerCase().contains('profil')) continue;
-      }
-      addIfNew(title, url);
-    }
+    final List<DocumentItem> apiDocs = docProvider.apiDocuments;
 
-    // Si aucun document réel, afficher des placeholders
-    if (docs.isEmpty) {
-      docs.addAll([
-        {'title': langProvider.translate('cv'), 'url': null},
-        {'title': langProvider.translate('id_card'), 'url': null},
-        {'title': langProvider.translate('cook_diploma'), 'url': null},
-      ]);
+    if (apiDocs.isNotEmpty) {
+      for (var d in apiDocs) {
+        addIfNew(d.displayName, d.url);
+      }
+    } else {
+      // Fallback sur user (legacy) ou placeholder
+      addIfNew(langProvider.translate('cook_diploma') ?? 'Diplôme de cuisine', user?.diplomePath);
+      addIfNew(langProvider.translate('medical_cert') ?? 'Certificat médical', user?.certificatMedical);
+      addIfNew(langProvider.translate('driving_license') ?? 'Permis de conduire', user?.permiConduire);
+
+      if (docs.isEmpty) {
+        docs.addAll([
+          {'title': langProvider.translate('cv') ?? 'Curriculum Vitae(CV)', 'url': null},
+          {'title': langProvider.translate('id_card') ?? 'Carte d\'identité', 'url': null},
+          {'title': langProvider.translate('cook_diploma') ?? 'Diplôme de cuisine', 'url': null},
+        ]);
+      }
     }
 
     return docs;
