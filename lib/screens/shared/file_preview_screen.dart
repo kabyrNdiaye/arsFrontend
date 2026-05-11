@@ -10,9 +10,8 @@ import 'dart:typed_data';
 import '../../utils/font_helper.dart';
 import '../../services/api_service.dart';
 
-// Web uniquement (Commenté pour APK Android)
-// import 'dart:ui_web' as ui_web;
-// import 'dart:html' as html;
+import 'web_view_stub.dart' if (dart.library.html) 'web_view_web.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class FilePreviewScreen extends StatefulWidget {
   final String fileUrl;
@@ -41,9 +40,27 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
   String? _localPdfPath;   // chemin local du PDF téléchargé
   Uint8List? _imageBytes;  // bytes de l'image
 
+  bool _isPdfResource = false;
+  bool _isImageResource = false;
+  bool _isWordResource = false;
+
   bool get _isPdf =>
       widget.fileType.toLowerCase() == 'pdf' ||
-      widget.fileUrl.toLowerCase().endsWith('.pdf');
+      widget.fileUrl.toLowerCase().contains('.pdf') ||
+      _isPdfResource;
+
+  bool get _isImage {
+    final u = widget.fileUrl.toLowerCase();
+    return u.endsWith('.jpg') || u.endsWith('.jpeg') ||
+        u.endsWith('.png') || u.endsWith('.webp') || u.endsWith('.avif') ||
+        u.contains('.jpg?') || u.contains('.png?') ||
+        _isImageResource;
+  }
+
+  bool get _isWord =>
+      widget.fileType.toLowerCase().contains('word') ||
+      widget.fileUrl.toLowerCase().contains('.doc') ||
+      _isWordResource;
 
   String? get _token => widget.authToken ?? ApiService().token;
 
@@ -65,8 +82,12 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
 
   // ─── Web (désactivé pour APK mobile) ──────────────────────────────────────
   Future<void> _loadWeb() async {
-    // Code Web désactivé — non compatible Android
-    if (mounted) setState(() => _isLoading = false);
+    try {
+      WebViewHelper.registerView(_viewType, widget.fileUrl);
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      if (mounted) setState(() { _errorMessage = 'Erreur Web: $e'; _isLoading = false; });
+    }
   }
 
   // ─── Mobile ─────────────────────────────────────────────────────────────
@@ -79,17 +100,25 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
         return;
       }
 
+      // Détection du type par les headers si possible
+      final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+      _isPdfResource = contentType.contains('pdf');
+      _isImageResource = contentType.contains('image');
+      _isWordResource = contentType.contains('msword') || contentType.contains('officedocument');
+
       if (_isPdf) {
         // Sauvegarder en fichier temporaire pour flutter_pdfview
         final dir = await getTemporaryDirectory();
         final rawName = widget.fileUrl.split('/').last.split('?').first;
-        final fileName = rawName.isNotEmpty ? rawName : '${widget.fileName}.pdf';
+        final fileName = rawName.contains('.') ? rawName : '${widget.fileName}.pdf';
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
         if (mounted) setState(() { _localPdfPath = file.path; _isLoading = false; });
-      } else {
-        // Image
+      } else if (_isImage) {
         if (mounted) setState(() { _imageBytes = response.bodyBytes; _isLoading = false; });
+      } else {
+        // Autre ou inconnu -> on tente en image si on a des bytes
+        if (mounted) setState(() { _imageBytes = response.bodyBytes; _imageResource = true; _isLoading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _errorMessage = '$e'; _isLoading = false; });
@@ -111,22 +140,12 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.open_in_new, color: Colors.white),
+                    tooltip: 'Ouvrir dans un nouvel onglet',
+                    onPressed: () async {
+                      await launchUrl(Uri.parse(widget.fileUrl), mode: LaunchMode.externalApplication);
+                    },
                   ),
-                  Expanded(
-                    child: Text(
-                      widget.fileName,
-                      style: getSourceSerifProStyle(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(width: 48.w),
                 ],
               ),
             ),
@@ -142,6 +161,17 @@ class _FilePreviewScreenState extends State<FilePreviewScreen> {
     if (kIsWeb) {
       if (_isLoading) return const Center(child: CircularProgressIndicator());
       if (_errorMessage != null) return _buildError();
+
+      // Sur Web, l'iframe (HtmlElementView) est capricieuse. 
+      // Si c'est une image, on préfère NetworkImage.
+      if (_isImage) {
+        return PhotoView(
+          imageProvider: NetworkImage(widget.fileUrl),
+          minScale: PhotoViewComputedScale.contained,
+          maxScale: PhotoViewComputedScale.covered * 2,
+        );
+      }
+
       return SizedBox.expand(child: HtmlElementView(viewType: _viewType));
     }
 
