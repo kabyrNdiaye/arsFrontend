@@ -759,13 +759,36 @@ class _ProfessionnelHomeScreenState extends State<ProfessionnelHomeScreen> {
                     ),
                   ),
                   SizedBox(height: 2.h),
-                  Text(
-                    dateStr,
-                    style: getInterStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey[500],
-                      fontWeight: FontWeight.w400,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        dateStr,
+                        style: getInterStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      if (mission.professionnelId == null) ...[
+                        SizedBox(width: 8.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            'Disponible',
+                            style: getInterStyle(
+                              fontSize: 10.sp,
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
