@@ -201,25 +201,49 @@ class User {
 
     const technicalKeys = {
       'id', 'nom', 'cheminFichier', 'type', 'statut', 'created_at', 'updated_at',
-      'user_id', 'documentable_id', 'documentable_type', 'photo_profil_path',
-      'profileImage', 'photo_profil', 'password', 'email_verified_at',
+      'user_id', 'documentable_id', 'documentable_type', 'password', 'email_verified_at',
     };
 
+    // 1. D'abord, extraire explicitement depuis le tableau 'documents' structuré (API v3/v4)
+    if (json['documents'] is List) {
+      for (var doc in json['documents']) {
+        if (doc is Map<String, dynamic>) {
+          final nom = doc['nom']?.toString() ?? 'document';
+          final url = doc['url']?.toString();
+          if (url != null && url.isNotEmpty && !technicalKeys.contains(nom)) {
+            final sanitized = sanitizeUrl(url);
+            if (sanitized != null) {
+              docs[nom] = sanitized;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Ensuite, scanner pour récupérer d'autres champs orphelins (ex: diplome_path en top level)
     void checkValue(String key, dynamic value) {
       if (value == null || value is! String || value.isEmpty) return;
       if (technicalKeys.contains(key)) return;
-      if (key.toLowerCase().contains('photo') || key.toLowerCase().contains('profil')) return;
+      
+      // La photo de profil apparaîtra de toute façon avec un label propre dans buildDocumentsSection 
+      // si on l'inclut, mais pour la rétrocompatibilité du parseur on la garde.
+      
       final val = value.toString();
       if (_looksLikeDocumentUrl(val)) {
         final sanitized = sanitizeUrl(val);
         if (sanitized != null && !docs.containsValue(sanitized)) {
-          docs[key] = sanitized;
+          // Éviter d'écraser un document correctement nommé par "url" ou "cheminFichier"
+          if (!docs.containsKey(key) && key != 'url' && key != 'cheminFichier') {
+             docs[key] = sanitized;
+          }
         }
       }
     }
 
     void scan(Map<String, dynamic> map) {
       map.forEach((key, value) {
+        if (key == 'documents') return; // Déjà traité
+        
         if (value is Map<String, dynamic>) {
           scan(value);
         } else if (value is List) {
