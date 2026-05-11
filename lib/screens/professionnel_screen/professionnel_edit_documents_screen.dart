@@ -308,44 +308,66 @@ class _ProfessionnelEditDocumentsScreenState
       );
     }
 
-    if (_documents.isEmpty) {
-      return Center(
-        child: Text(
-          'Aucun document trouvé',
-          style: getSourceSerifProStyle(fontSize: 14.sp, color: Colors.grey),
-        ),
-      );
-    }
-
     return ListView(
       padding: EdgeInsets.all(16.w),
       children: [
-        // Info
-        Container(
-          padding: EdgeInsets.all(12.w),
-          margin: EdgeInsets.only(bottom: 16.h),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE3F2FD),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _primaryBlue.withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, color: _primaryBlue, size: 20),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: Text(
-                  'Cliquez sur un document pour le remplacer.',
-                  style: getSourceSerifProStyle(
-                      fontSize: 12.sp, color: _primaryBlue),
-                ),
+        if (_documents.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 40.h),
+            child: Center(
+              child: Text(
+                'Aucun document trouvé',
+                style: getSourceSerifProStyle(fontSize: 14.sp, color: Colors.grey),
               ),
-            ],
+            ),
+          )
+        else ...[
+          // Info
+          Container(
+            padding: EdgeInsets.all(12.w),
+            margin: EdgeInsets.only(bottom: 16.h),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _primaryBlue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: _primaryBlue, size: 20),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    'Cliquez sur un document pour le remplacer.',
+                    style: getSourceSerifProStyle(
+                        fontSize: 12.sp, color: _primaryBlue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Liste des documents
+          ..._documents.map((doc) => _buildDocTile(doc)),
+        ],
+
+        SizedBox(height: 20.h),
+
+        // Bouton Ajouter
+        ElevatedButton.icon(
+          onPressed: _isLoadingDocs ? null : _addDocument,
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text('Ajouter un document'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: _primaryBlue,
+            side: const BorderSide(color: _primaryBlue),
+            padding: EdgeInsets.symmetric(vertical: 14.h),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
-
-        // Liste des documents
-        ..._documents.map((doc) => _buildDocTile(doc)),
+        SizedBox(height: 40.h),
+      ],
+    );
+  }
 
         SizedBox(height: 20.h),
 
