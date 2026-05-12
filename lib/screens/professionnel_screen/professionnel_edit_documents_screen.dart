@@ -243,6 +243,9 @@ class _ProfessionnelEditDocumentsScreenState
 
     // Recharger la liste et le profil
     await _loadDocuments();
+    if (mounted) {
+      await Provider.of<DocumentProvider>(context, listen: false).fetchDocuments();
+    }
     await Provider.of<AuthProvider>(context, listen: false).loadProfile();
 
     setState(() => _pendingFiles.clear());

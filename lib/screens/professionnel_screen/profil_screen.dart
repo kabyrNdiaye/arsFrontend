@@ -379,8 +379,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
     return GestureDetector(
       onTap: () {
         if (url != null && url.isNotEmpty) {
-          final String ext = url.split('.').last.toLowerCase();
-          final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png') ? 'image' : 'pdf';
+          // Détection robuste de l'extension
+          final String cleanUrl = url.split('?').first;
+          final String ext = cleanUrl.contains('.') ? cleanUrl.split('.').last.toLowerCase() : '';
+          final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'webp') ? 'image' : 'pdf';
           
           Navigator.push(
             context,
