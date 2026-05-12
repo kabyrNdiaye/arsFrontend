@@ -50,30 +50,34 @@ class _ProfessionnelEditDocumentsScreenState
       
       // 1. Curriculum Vitae(CV)
       final cv = apiDocs.firstWhere(
-        (d) => d.nom.contains('Curriculum') || d.nom == 'cv_path',
+        (d) => d.nom.toLowerCase().contains('curriculum') || 
+               d.nom.toLowerCase() == 'cv' || 
+               d.nom == 'cv_path',
         orElse: () => DocumentItem(id: -1, nom: 'Curriculum Vitae(CV)', url: '', statut: 'manquant')
       );
       dossiers.add(cv);
 
       // 2. Carte d'identité
       final idCard = apiDocs.firstWhere(
-        (d) => d.nom.contains('identité') || d.nom == 'identite_path',
+        (d) => d.nom.toLowerCase().contains('identité') || 
+               d.nom.toLowerCase().contains('identite') || 
+               d.nom == 'identite_path',
         orElse: () => DocumentItem(id: -2, nom: 'Carte d\'identité', url: '', statut: 'manquant')
       );
       dossiers.add(idCard);
 
       // 3. Diplôme de cuisine
       final diplome = apiDocs.firstWhere(
-        (d) => d.nom.contains('Diplôme') || d.nom == 'diplome_path',
+        (d) => d.nom.toLowerCase().contains('diplôme') || 
+               d.nom.toLowerCase().contains('diplome') || 
+               d.nom == 'diplome_path',
         orElse: () => DocumentItem(id: -3, nom: 'Diplôme de cuisine', url: '', statut: 'manquant')
       );
       dossiers.add(diplome);
 
       // 4. Documents additionnels (tout le reste)
       final additions = apiDocs.where((d) => 
-        !d.nom.contains('Curriculum') && d.nom != 'cv_path' &&
-        !d.nom.contains('identité') && d.nom != 'identite_path' &&
-        !d.nom.contains('Diplôme') && d.nom != 'diplome_path'
+        !dossiers.any((fixed) => fixed.id == d.id)
       ).toList();
       dossiers.addAll(additions);
 
@@ -490,8 +494,10 @@ class _ProfessionnelEditDocumentsScreenState
               if (hasUrl)
                 IconButton(
                   onPressed: () {
-                    final String ext = doc.url.split('.').last.toLowerCase();
-                    final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png') ? 'image' : 'pdf';
+                    // Détection robuste de l'extension
+                    final String cleanUrl = doc.url.split('?').first;
+                    final String ext = cleanUrl.contains('.') ? cleanUrl.split('.').last.toLowerCase() : '';
+                    final String fileType = (ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'webp') ? 'image' : 'pdf';
                     
                     Navigator.push(
                       context,
