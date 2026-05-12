@@ -75,6 +75,7 @@ class _AdminChangePasswordScreenState extends State<AdminChangePasswordScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        toolbarHeight: 75.h,
         title: Text(
           langProvider.translate('change_password'),
           style: getSourceSerifProStyle(
@@ -93,6 +94,7 @@ class _AdminChangePasswordScreenState extends State<AdminChangePasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              SizedBox(height: 30.h),
               Text(
                 langProvider.translate('secure_account_desc'),
                 style: getSourceSerifProStyle(

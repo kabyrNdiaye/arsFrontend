@@ -7,6 +7,7 @@ import '../shared/file_preview_screen.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/document_provider.dart';
 import '../../services/document_service.dart';
 import '../../services/api_service.dart';
 

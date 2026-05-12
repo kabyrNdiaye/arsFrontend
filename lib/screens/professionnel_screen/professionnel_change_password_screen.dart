@@ -85,6 +85,7 @@ class _ProfessionnelChangePasswordScreenState extends State<ProfessionnelChangeP
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
+          toolbarHeight: 75.h,
           title: Text(
             langProvider.translate('change_password') ?? 'Changer de mot de passe',
             style: getInterStyle(
@@ -104,6 +105,7 @@ class _ProfessionnelChangePasswordScreenState extends State<ProfessionnelChangeP
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SizedBox(height: 30.h),
                 Text(
                   langProvider.translate('secure_account_desc') ?? 'Pour sécuriser votre compte, veuillez choisir un mot de passe fort.',
                   style: getInterStyle(
