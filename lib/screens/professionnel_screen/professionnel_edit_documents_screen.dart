@@ -8,6 +8,7 @@ import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/document_service.dart';
+import '../../services/api_service.dart';
 
 class ProfessionnelEditDocumentsScreen extends StatefulWidget {
   const ProfessionnelEditDocumentsScreen({Key? key}) : super(key: key);
@@ -499,7 +500,7 @@ class _ProfessionnelEditDocumentsScreenState
                           fileUrl: doc.url,
                           fileName: doc.displayName,
                           fileType: fileType,
-                          authToken: Provider.of<AuthProvider>(context, listen: false).token,
+                          authToken: ApiService().token,
                         ),
                       ),
                     );
