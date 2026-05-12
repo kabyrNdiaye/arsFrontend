@@ -200,6 +200,10 @@ class _AdminMissionDetailScreenState extends State<AdminMissionDetailScreen> {
           _buildVerticalSeparator(),
           SizedBox(width: 12.w),
           _buildQuickInfoItem(Icons.timer_off_outlined, widget.mission.heureFin ?? "...", "Clôture"),
+          SizedBox(width: 12.w),
+          _buildVerticalSeparator(),
+          SizedBox(width: 12.w),
+          _buildQuickInfoItem(Icons.euro_rounded, widget.mission.remuneration != null ? "${widget.mission.remuneration} €" : "...", "Rémunération"),
         ],
       ),
     );

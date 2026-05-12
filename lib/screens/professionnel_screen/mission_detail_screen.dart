@@ -227,6 +227,24 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                       ),
                     ],
                   ),
+                  
+                  SizedBox(height: 4.h),
+                  
+                  // Rémunération
+                  Row(
+                    children: [
+                      Icon(Icons.euro_rounded, color: Colors.white70, size: 16.sp),
+                      SizedBox(width: 6.w),
+                      Text(
+                        widget.mission.remuneration != null ? '${widget.mission.remuneration} €' : '...',
+                        style: getInterStyle(
+                          fontSize: 13.sp,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

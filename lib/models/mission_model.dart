@@ -31,6 +31,7 @@ class MissionModel {
   final String? codeEntree;
   final String? codeCuisine;
   final Map<String, bool>? checklistJournee;
+  final String? remuneration;
 
   MissionModel({
     required this.id,
@@ -62,6 +63,7 @@ class MissionModel {
     this.codeEntree,
     this.codeCuisine,
     this.checklistJournee,
+    this.remuneration,
   });
 
   MissionModel copyWith({
@@ -73,6 +75,7 @@ class MissionModel {
     int? nbChefs,
     DateTime? dateFin,
     Map<String, bool>? checklistJournee,
+    String? remuneration,
   }) {
     return MissionModel(
       id: id,
@@ -103,6 +106,7 @@ class MissionModel {
       codeEntree: codeEntree ?? this.codeEntree,
       codeCuisine: codeCuisine ?? this.codeCuisine,
       checklistJournee: checklistJournee ?? this.checklistJournee,
+      remuneration: remuneration ?? this.remuneration,
     );
   }
 
@@ -214,6 +218,7 @@ class MissionModel {
       checklistJournee: json['checklist_journee'] != null 
           ? Map<String, bool>.from(json['checklist_journee']) 
           : null,
+      remuneration: json['remuneration']?.toString(),
     );
   }
 
@@ -257,6 +262,7 @@ class MissionModel {
       'code_entree': codeEntree,
       'code_cuisine': codeCuisine,
       'checklist_journee': checklistJournee,
+      'remuneration': remuneration,
     };
   }
 }

@@ -50,6 +50,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
   late TextEditingController _hachesController;
   late TextEditingController _mixesController;
   late TextEditingController _moulinesController;
+  late TextEditingController _remunerationController;
 
   DateTime? _selectedDate;
   DateTime? _selectedEndDate;
@@ -98,6 +99,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
     _hachesController = TextEditingController(text: '0');
     _mixesController = TextEditingController(text: '0');
     _moulinesController = TextEditingController(text: '0');
+    _remunerationController = TextEditingController();
 
     // Charger le modèle complet via l'API
     _loadMissionDetails();
@@ -318,6 +320,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
     _commentsController.text = m.commentaires ?? '';
     _entryCodeController.text = m.codeEntree ?? '';
     _kitchenCodeController.text = m.codeCuisine ?? '';
+    _remunerationController.text = m.remuneration ?? '';
     _selectedDiets = List.from(m.regimesSpeciaux);
 
     // Correction: Pré-remplir l'adresse depuis le modèle si elle est présente
@@ -354,6 +357,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
     _hachesController.dispose();
     _mixesController.dispose();
     _moulinesController.dispose();
+    _remunerationController.dispose();
     super.dispose();
   }
 
@@ -800,8 +804,9 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
                             _buildEditableTextField(_entryCodeController,
                                 "Code d'entrée", Icons.key_outlined),
                             SizedBox(height: 16.h),
-                            _buildEditableTextField(_kitchenCodeController,
-                                'Code cuisine', Icons.lock_outline_rounded),
+                            _buildEditableTextField(_kitchenCodeController, 'Code cuisine', Icons.lock_outline_rounded),
+                            SizedBox(height: 16.h),
+                            _buildEditableTextField(_remunerationController, 'Rémunération (€)', Icons.euro_rounded),
                           ],
                         ),
                         SizedBox(height: 20.h),
@@ -2243,6 +2248,7 @@ class _AdminEditMissionScreenState extends State<AdminEditMissionScreen> {
         'nb_regimes_haches': int.tryParse(_hachesController.text) ?? 0,
         'nb_regimes_mixes': int.tryParse(_mixesController.text) ?? 0,
         'nb_regimes_moulines': int.tryParse(_moulinesController.text) ?? 0,
+        'remuneration': _remunerationController.text,
         'recettes_ids': recipeIds,
       };
 

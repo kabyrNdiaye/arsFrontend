@@ -58,6 +58,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
   late TextEditingController _hachesController;
   late TextEditingController _mixesController;
   late TextEditingController _moulinesController;
+  late TextEditingController _remunerationController;
 
   DateTime? _selectedDate;
   DateTime? _selectedEndDate;
@@ -90,6 +91,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
     _hachesController = TextEditingController(text: '0');
     _mixesController = TextEditingController(text: '0');
     _moulinesController = TextEditingController(text: '0');
+    _remunerationController = TextEditingController();
     _loadStructures();
   }
 
@@ -134,6 +136,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
     _hachesController.dispose();
     _mixesController.dispose();
     _moulinesController.dispose();
+    _remunerationController.dispose();
     super.dispose();
   }
 
@@ -1018,6 +1021,8 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
                             _buildEditableTextField(_entryCodeController, "Code d'entrée", Icons.key_outlined),
                             SizedBox(height: 16.h),
                             _buildEditableTextField(_kitchenCodeController, 'Code cuisine', Icons.lock_outline_rounded),
+                            SizedBox(height: 16.h),
+                            _buildEditableTextField(_remunerationController, 'Rémunération (€)', Icons.euro_rounded),
                           ],
                         ),
                         SizedBox(height: 20.h),
@@ -1405,8 +1410,11 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
         createData['date_fin'] = dateFinStr;
       }
 
-      if (_selectedEndTime != null) {
         createData['heure_fin'] = "${_selectedEndTime!.hour.toString().padLeft(2, '0')}:${_selectedEndTime!.minute.toString().padLeft(2, '0')}";
+      }
+
+      if (_remunerationController.text.isNotEmpty) {
+        createData['remuneration'] = _remunerationController.text;
       }
 
       final missionProvider = Provider.of<MissionProvider>(context, listen: false);
