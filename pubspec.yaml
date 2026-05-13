@@ -43,6 +43,8 @@ dependencies:
   flutter_secure_storage: ^10.1.0
   web_socket_channel: ^3.0.3
   connectivity_plus: ^7.1.1
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
 
 dependency_overrides:
 

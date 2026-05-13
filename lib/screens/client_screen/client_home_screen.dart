@@ -22,6 +22,8 @@ import '../../services/incident_service.dart';
 import '../../services/retour_service.dart';
 import '../shared/file_preview_screen.dart';
 import '../../services/api_service.dart';
+import 'client_edit_inscription_screen.dart';
+import 'mission_qr_scanner_screen.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   final String? userName;
@@ -755,6 +757,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             langProvider,
           ),
           SizedBox(height: 10.h),
+          // Bouton Modifier mon dossier (violet)
+          _buildActionButtonEdit(langProvider),
+          SizedBox(height: 10.h),
+          // Bouton Scanner fin de mission (bleu)
+          _buildActionButtonQrScan(langProvider),
+          SizedBox(height: 10.h),
           // Bouton Paramètres (gris)
           _buildActionButtonGrey(
             langProvider.translate('settings'),
@@ -835,6 +843,90 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             Expanded(
               child: Text(
                 label,
+                style: getSourceSerifProStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16.sp),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtonEdit(LanguageProvider langProvider) {
+    return GestureDetector(
+      onTap: () async {
+        final updated = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ClientEditInscriptionScreen(),
+          ),
+        );
+        // Si des données ont été modifiées, recharger le profil
+        if (updated == true && mounted) {
+          await Provider.of<AuthProvider>(context, listen: false).loadProfile();
+          setState(() {}); // Rafraîchir l'affichage
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFF7C39D3),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.edit_outlined, color: Colors.white, size: 20.sp),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                'Modifier mon dossier',
+                style: getSourceSerifProStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16.sp),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtonQrScan(LanguageProvider langProvider) {
+    return GestureDetector(
+      onTap: () async {
+        final validated = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MissionQrScannerScreen(),
+          ),
+        );
+        if (validated == true && mounted) {
+          Provider.of<MissionProvider>(context, listen: false).fetchMissions();
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0059AB),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.qr_code_scanner, color: Colors.white, size: 20.sp),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                'Scanner fin de mission',
                 style: getSourceSerifProStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w500,

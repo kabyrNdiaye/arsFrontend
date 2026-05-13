@@ -14,7 +14,9 @@ import '../../services/retour_service.dart';
 import 'package:provider/provider.dart';
 
 class AdminIncidentsScreen extends StatefulWidget {
-  const AdminIncidentsScreen({Key? key}) : super(key: key);
+  final int initialTabIndex;
+
+  const AdminIncidentsScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
 
   @override
   _AdminIncidentsScreenState createState() => _AdminIncidentsScreenState();
@@ -32,23 +34,31 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
   bool _isLoading = true;
   List<Map<String, dynamic>> _allIncidents = [];
   List<Map<String, dynamic>> _allFeedbacks = [];
+  List<Map<String, dynamic>> _allCancellations = [];
   final Set<int> _markingHandled = {};
   AppLifecycleState? _lastLifecycleState;
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _incidentScrollController = ScrollController();
   final ScrollController _feedbackScrollController = ScrollController();
+  final ScrollController _cancellationScrollController = ScrollController();
   bool _showFab = false;
   String _searchQuery = '';
+
+  // Pagination — nombre d'items visibles par onglet
+  int _incidentDisplayCount = 3;
+  int _feedbackDisplayCount = 3;
+  int _cancellationDisplayCount = 3;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
     _tabController.addListener(_handleTabSelection);
     _incidentScrollController.addListener(_scrollListener);
     _feedbackScrollController.addListener(_scrollListener);
+    _cancellationScrollController.addListener(_scrollListener);
     _loadData();
   }
 
@@ -65,7 +75,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
   void _checkFabVisibility() {
     ScrollController activeController = _tabController.index == 0
         ? _incidentScrollController
-        : _feedbackScrollController;
+        : _tabController.index == 1
+            ? _feedbackScrollController
+            : _cancellationScrollController;
     if (activeController.hasClients) {
       if (activeController.offset > 50 && !_showFab) {
         setState(() => _showFab = true);
@@ -78,7 +90,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
   void _scrollToTop() {
     ScrollController activeController = _tabController.index == 0
         ? _incidentScrollController
-        : _feedbackScrollController;
+        : _tabController.index == 1
+            ? _feedbackScrollController
+            : _cancellationScrollController;
     if (activeController.hasClients) {
       activeController.animateTo(0,
           duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -99,6 +113,7 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
     _searchController.dispose();
     _incidentScrollController.dispose();
     _feedbackScrollController.dispose();
+    _cancellationScrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
@@ -136,15 +151,31 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       // Mapper les incidents de la table
       final List<Map<String, dynamic>> tableIncidents = List<Map<String, dynamic>>.from(results[0]);
       for (var inc in tableIncidents) {
+        // Nom établissement : chercher dans plusieurs chemins possibles
+        final structureUser = inc['mission']?['structure']?['user'];
+        final structureName = inc['mission']?['structure']?['nom_etablissement']
+            ?? structureUser?['nom_etablissement']
+            ?? structureUser?['name']
+            ?? inc['mission']?['establishment']
+            ?? 'Établissement inconnu';
+
+        // Nom professionnel
+        final proUser = inc['mission']?['professionnel']?['user'];
+        final proName = proUser?['prenom'] != null
+            ? '${proUser['prenom']} ${proUser['nom'] ?? ''}'.trim()
+            : proUser?['name']
+            ?? inc['mission']?['professionnel']?['name']
+            ?? 'Professionnel inconnu';
+
         incidents.add({
           'id': inc['id'],
           'content': inc['description'] ?? '',
           'type': 'incident',
           'is_handled': inc['statut'] == 'Traité' || inc['statut'] == 'Résolu',
           'created_at': inc['created_at'],
-          'sender_name': inc['mission']?['professionnel']?['user']?['name'] ?? 'Professionnel',
+          'sender_name': proName,
           '_mission_id': inc['mission_id'],
-          '_mission_name': inc['mission']?['structure']?['user']?['name'] ?? 'Mission',
+          '_mission_name': structureName,
           '_is_table_record': true,
           '_incident_type': inc['type'],
         });
@@ -153,13 +184,29 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       // Mapper les feedbacks de la table
       final List<Map<String, dynamic>> tableFeedbacks = List<Map<String, dynamic>>.from(results[1]);
       for (var f in tableFeedbacks) {
+        final structureUser = f['mission']?['structure']?['user'];
+        final fbStructureName = f['mission']?['structure']?['nom_etablissement']
+            ?? structureUser?['nom_etablissement']
+            ?? structureUser?['name']
+            ?? f['mission']?['establishment']
+            ?? '';
+
+        final fbProUser = f['mission']?['professionnel']?['user'];
+        final fbProName = fbProUser?['prenom'] != null
+            ? '${fbProUser['prenom']} ${fbProUser['nom'] ?? ''}'.trim()
+            : fbProUser?['name']
+            ?? f['user']?['name']
+            ?? '';
+
         feedbacks.add({
           'id': f['id'],
           'content': '[Note: ${f['rating']}/5] ' + (f['comment'] ?? ''),
           'type': 'feedback',
-          'is_handled': false, // Les feedbacks n'ont pas de statut handled par défaut
+          'is_handled': false,
           'created_at': f['created_at'],
-          'sender_name': f['user']?['name'] ?? 'Utilisateur',
+          'sender_name': fbProName,
+          '_mission_name': fbStructureName,
+          '_mission_id': f['mission_id'],
           '_is_table_record': true,
         });
       }
@@ -167,15 +214,27 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       // Mapper les retours de mission de la table
       final List<Map<String, dynamic>> tableRetours = List<Map<String, dynamic>>.from(results[2]);
       for (var r in tableRetours) {
+        final structureUser = r['mission']?['structure']?['user'];
+        final structureName = r['mission']?['structure']?['nom_etablissement']
+            ?? structureUser?['nom_etablissement']
+            ?? structureUser?['name']
+            ?? 'Établissement inconnu';
+
+        final proUser = r['mission']?['professionnel']?['user'];
+        final proName = proUser?['prenom'] != null
+            ? '${proUser['prenom']} ${proUser['nom'] ?? ''}'.trim()
+            : proUser?['name']
+            ?? 'Professionnel inconnu';
+
         feedbacks.add({
           'id': r['id'],
           'content': '[Note: ${r['note']}/5] ' + (r['commentaire'] ?? ''),
           'type': 'feedback',
           'is_handled': false,
           'created_at': r['created_at'],
-          'sender_name': r['mission']?['professionnel']?['user']?['name'] ?? 'Professionnel',
+          'sender_name': proName,
           '_mission_id': r['mission_id'],
-          '_mission_name': r['mission']?['structure']?['user']?['name'] ?? 'Mission',
+          '_mission_name': structureName,
           '_is_table_record': true,
         });
       }
@@ -224,6 +283,29 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       setState(() {
         _allIncidents = incidents;
         _allFeedbacks = feedbacks;
+        // Extraire les annulations depuis les missions refusées/annulées
+        _allCancellations = missionProvider.missions
+            .where((m) =>
+                m.userStatus == 'refusé' ||
+                m.status?.toLowerCase() == 'annulé' ||
+                m.status?.toLowerCase() == 'annulée' ||
+                m.status?.toLowerCase() == 'cancelled')
+            .map((m) => {
+                  'id': m.id,
+                  '_mission_name': m.structureName ?? 'Mission',
+                  'sender_name': m.professionnelNom ?? 'Professionnel',
+                  'content': m.commentaires ?? m.adminComments ?? 'Aucun motif renseigné',
+                  'created_at': m.horaireMission?.toIso8601String(),
+                  'status': m.status ?? 'Annulé',
+                  'user_status': m.userStatus ?? '',
+                  '_mission_id': m.id,
+                })
+            .toList()
+          ..sort((a, b) {
+            final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+            final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+            return bDate.compareTo(aDate);
+          });
         _isLoading = false;
       });
     }
@@ -280,15 +362,32 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                             sender.contains(_searchQuery);
                       }).toList();
 
+                      final filteredCancellations = _allCancellations.where((item) {
+                        final content = (item['content'] ?? '').toLowerCase();
+                        final mission = (item['_mission_name'] ?? '').toLowerCase();
+                        final sender = (item['sender_name'] ?? '').toLowerCase();
+                        return content.contains(_searchQuery) ||
+                            mission.contains(_searchQuery) ||
+                            sender.contains(_searchQuery);
+                      }).toList();
+
                       return TabBarView(
                         controller: _tabController,
                         children: [
                           _buildList(filteredIncidents,
                               isIncident: true,
-                              controller: _incidentScrollController),
+                              controller: _incidentScrollController,
+                              displayCount: _incidentDisplayCount,
+                              onLoadMore: () => setState(() => _incidentDisplayCount += 3)),
                           _buildList(filteredFeedbacks,
                               isIncident: false,
-                              controller: _feedbackScrollController),
+                              controller: _feedbackScrollController,
+                              displayCount: _feedbackDisplayCount,
+                              onLoadMore: () => setState(() => _feedbackDisplayCount += 3)),
+                          _buildCancellationList(filteredCancellations,
+                              controller: _cancellationScrollController,
+                              displayCount: _cancellationDisplayCount,
+                              onLoadMore: () => setState(() => _cancellationDisplayCount += 3)),
                         ],
                       );
                     }),
@@ -351,20 +450,6 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
             ),
           ),
           SizedBox(height: 8.h),
-          // Résumé rapide
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: Row(
-              children: [
-                _buildCounter(_allIncidents.length, 'Incidents',
-                    Colors.red[200]!, Colors.red),
-                SizedBox(width: 12.w),
-                _buildCounter(_allFeedbacks.length, 'Retours',
-                    Colors.amber[200]!, Colors.amber[800]!),
-              ],
-            ),
-          ),
-          SizedBox(height: 16.h),
           // Search Bar
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -380,6 +465,10 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                 onChanged: (value) {
                   setState(() {
                     _searchQuery = value.toLowerCase();
+                    // Réinitialiser la pagination à chaque nouvelle recherche
+                    _incidentDisplayCount = 3;
+                    _feedbackDisplayCount = 3;
+                    _cancellationDisplayCount = 3;
                   });
                 },
                 decoration: InputDecoration(
@@ -415,6 +504,8 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
             unselectedLabelColor: Colors.white60,
             indicatorColor: Colors.white,
             indicatorSize: TabBarIndicatorSize.label,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(
                 child: Row(
@@ -435,6 +526,18 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                     Icon(Icons.star_rounded, size: 16.sp),
                     SizedBox(width: 6.w),
                     Text('Retours (${_allFeedbacks.length})',
+                        style: getInterStyle(
+                            fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cancel_outlined, size: 16.sp),
+                    SizedBox(width: 6.w),
+                    Text('Annulations (${_allCancellations.length})',
                         style: getInterStyle(
                             fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   ],
@@ -485,7 +588,10 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
   }
 
   Widget _buildList(List<Map<String, dynamic>> items,
-      {required bool isIncident, required ScrollController controller}) {
+      {required bool isIncident,
+      required ScrollController controller,
+      required int displayCount,
+      required VoidCallback onLoadMore}) {
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -524,9 +630,36 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       color: _adminPurple,
       child: ListView.builder(
         controller: controller,
-        padding: EdgeInsets.all(16.w),
-        itemCount: items.length,
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 32.h),
+        itemCount: items.take(displayCount).length + (items.length > displayCount ? 1 : 0),
         itemBuilder: (context, index) {
+          // Bouton "Voir plus"
+          if (index == items.take(displayCount).length) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.h),
+              child: Center(
+                child: OutlinedButton.icon(
+                  onPressed: onLoadMore,
+                  icon: Icon(Icons.expand_more, color: _adminPurple),
+                  label: Text(
+                    'Voir ${items.length - displayCount > 3 ? 3 : items.length - displayCount} de plus',
+                    style: getInterStyle(
+                        fontSize: 13.sp,
+                        color: _adminPurple,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: _adminPurple),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 20.w, vertical: 10.h),
+                  ),
+                ),
+              ),
+            );
+          }
+
           final msg = items[index];
           final messageId = msg['id'] is int
               ? msg['id'] as int
@@ -543,45 +676,37 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
               if (_markingHandled.contains(messageId)) return;
 
               setState(() => _markingHandled.add(messageId));
+              final isCurrentlyHandled = msg['is_handled'] == true;
+
               try {
                 if (msg['_is_table_record'] == true) {
                   if (msg['type'] == 'incident') {
-                    // Mettre à jour la table incidents
-                    await _incidentService.updateIncident(messageId, {'statut': 'Traité'});
-                  } else {
-                    // Pour les feedbacks généraux/retours, on peut simplement marquer en UI 
-                    // ou ajouter une colonne handled en DB si nécessaire plus tard.
-                    // Pour l'instant, c'est un succès immédiat en UI.
+                    final newStatut = isCurrentlyHandled ? 'En attente' : 'Traité';
+                    await _incidentService.updateIncident(messageId, {'statut': newStatut});
                   }
+                  // Pour les feedbacks : toggle UI uniquement
                 } else {
-                  // Ancien système : Marquer le message de chat comme traité
-                  await _missionService.markMessageAsHandled(messageId);
+                  if (!isCurrentlyHandled) {
+                    await _missionService.markMessageAsHandled(messageId);
+                  }
                 }
 
                 setState(() {
-                  msg['is_handled'] = true;
+                  msg['is_handled'] = !isCurrentlyHandled;
                   _markingHandled.remove(messageId);
                 });
-                
-                // Marquer également comme lu dans le NotificationProvider pour décrémenter la cloche
-                final missionId = msg['_mission_id'];
-                if (missionId != null) {
-                  final notifProvider = Provider.of<NotificationProvider>(context, listen: false);
-                  notifProvider.markAsReadByMissionId(missionId);
-                  
-                  // Et marquer localement dans MissionProvider pour le badge de la mission
-                  final missionProvider = Provider.of<MissionProvider>(context, listen: false);
-                  missionProvider.markMissionAsReadLocal(missionId);
-                }
-                
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isIncident
-                          ? 'Incident marqué comme traité'
-                          : 'Retour marqué comme lu'),
-                      backgroundColor:
-                          isIncident ? Colors.orange : Colors.green,
+                      content: Text(
+                        isCurrentlyHandled
+                            ? (isIncident ? 'Traitement annulé' : 'Marqué comme non lu')
+                            : (isIncident ? 'Incident marqué comme traité' : 'Retour marqué comme lu'),
+                      ),
+                      backgroundColor: isCurrentlyHandled
+                          ? Colors.orange
+                          : (isIncident ? Colors.orange : Colors.green),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -597,6 +722,170 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                 }
               }
             },
+          );
+        },
+      ),
+    );
+  }
+  Widget _buildCancellationList(List<Map<String, dynamic>> items,
+      {required ScrollController controller,
+      required int displayCount,
+      required VoidCallback onLoadMore}) {
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, size: 64.sp, color: Colors.grey[300]),
+            SizedBox(height: 16.h),
+            Text(
+              'Aucune annulation',
+              style: getInterStyle(
+                  fontSize: 16.sp,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w500),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Aucune mission n\'a été annulée',
+              style: getInterStyle(fontSize: 13.sp, color: Colors.grey[400]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: _adminPurple,
+      child: ListView.builder(
+        controller: controller,
+        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 32.h),
+        itemCount: items.take(displayCount).length + (items.length > displayCount ? 1 : 0),
+        itemBuilder: (context, index) {
+          // Bouton "Voir plus"
+          if (index == items.take(displayCount).length) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.h),
+              child: Center(
+                child: OutlinedButton.icon(
+                  onPressed: onLoadMore,
+                  icon: Icon(Icons.expand_more, color: _adminPurple),
+                  label: Text(
+                    'Voir ${items.length - displayCount > 3 ? 3 : items.length - displayCount} de plus',
+                    style: getInterStyle(
+                        fontSize: 13.sp,
+                        color: _adminPurple,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: _adminPurple),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 20.w, vertical: 10.h),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final item = items[index];
+          final String missionName = item['_mission_name'] ?? 'Mission';
+          final String senderName = item['sender_name'] ?? 'Professionnel';
+          final String motif = item['content'] ?? 'Aucun motif renseigné';
+          final DateTime? date = item['created_at'] != null
+              ? DateTime.tryParse(item['created_at'])
+              : null;
+          final String dateStr = date != null
+              ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+              : '-';
+
+          return Container(
+            margin: EdgeInsets.only(bottom: 12.h),
+            padding: EdgeInsets.all(14.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orange[200]!, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[700],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cancel_outlined, color: Colors.white, size: 12.sp),
+                          SizedBox(width: 4.w),
+                          Text('ANNULATION',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(dateStr,
+                        style: getInterStyle(
+                            fontSize: 11.sp, color: Colors.grey[500])),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                Row(
+                  children: [
+                    Icon(Icons.business, size: 14.sp, color: Colors.grey[600]),
+                    SizedBox(width: 6.w),
+                    Expanded(
+                      child: Text(missionName,
+                          style: getInterStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87)),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4.h),
+                Row(
+                  children: [
+                    Icon(Icons.person_outline, size: 14.sp, color: Colors.grey[600]),
+                    SizedBox(width: 6.w),
+                    Text(senderName,
+                        style: getInterStyle(
+                            fontSize: 12.sp, color: Colors.grey[600])),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(10.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    motif,
+                    style: getInterStyle(fontSize: 13.sp, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -640,267 +929,366 @@ class __MessageCardState extends State<_MessageCard> {
     final String senderName =
         msg['user']?['name'] ?? msg['sender_name'] ?? 'Professionnel';
 
-    // Extract rating from feedback content
+    // Note pour les retours
     String? rating;
     if (!isIncident) {
-      final ratingMatch =
-          RegExp(r'\[Note: (\d+\.?\d*)/5\]').firstMatch(content);
+      final ratingMatch = RegExp(r'\[Note: (\d+\.?\d*)/5\]').firstMatch(content);
       if (ratingMatch != null) rating = ratingMatch.group(1);
     }
 
-    // Extract incident type
-    String? incidentType;
-    if (isIncident) {
-      final typeMatch = RegExp(r'\[([^\]]+)\]').firstMatch(content);
-      if (typeMatch != null) incidentType = typeMatch.group(1);
-    }
-
-    // Clean content
+    // Contenu nettoyé
     String cleanContent = content
         .replaceAll(RegExp(r'^🚨 INCIDENT: \[[^\]]+\] '), '')
         .replaceAll(RegExp(r'^⭐ FEEDBACK: \[Note: \d+\.?\d*/5\] '), '')
         .trim();
 
-    final Color cardBg = isIncident ? Colors.red[50]! : Colors.amber[50]!;
-    final Color borderColor =
-        isIncident ? Colors.red[200]! : Colors.amber[300]!;
-    final Color accentColor = isIncident ? Colors.red : Colors.amber[800]!;
+    // Couleurs selon type
+    final Color accentColor = isIncident
+        ? const Color(0xFFE53935)
+        : const Color(0xFF7C39D3);
+    final Color bgColor = isIncident
+        ? const Color(0xFFFFF5F5)
+        : const Color(0xFFF5F0FF);
+    final Color borderColor = isIncident
+        ? const Color(0xFFFFCDD2)
+        : const Color(0xFFD1C4E9);
+    final Color badgeBg = isIncident
+        ? const Color(0xFFE53935)
+        : const Color(0xFF7C39D3);
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12.h),
-      padding: EdgeInsets.all(12.w),
+      margin: EdgeInsets.only(bottom: 14.h),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.5),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: accentColor.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: type badge + heure
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isIncident
-                          ? Icons.warning_amber_rounded
-                          : Icons.star_rounded,
-                      color: Colors.white,
-                      size: 12.sp,
-                    ),
-                    SizedBox(width: 4.w),
-                    Text(
-                      isIncident
-                          ? (incidentType ?? 'Incident').toUpperCase()
-                          : 'RETOUR',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (createdAt != null)
-                Text(
-                  DateFormat('dd/MM à HH:mm').format(createdAt),
-                  style:
-                      getInterStyle(fontSize: 11.sp, color: Colors.grey[600]),
-                ),
-            ],
-          ),
-          SizedBox(height: 10.h),
-
-          // Mission name
-          Row(
-            children: [
-              Icon(Icons.apartment_outlined,
-                  size: 14.sp, color: Colors.grey[600]),
-              SizedBox(width: 6.w),
-              Expanded(
-                child: Text(
-                  missionName,
-                  style: getInterStyle(
-                    fontSize: 13.sp,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 6.h),
-
-          // Sender
-          Row(
-            children: [
-              Icon(Icons.person_outline, size: 14.sp, color: Colors.grey[600]),
-              SizedBox(width: 6.w),
-              Text(
-                senderName,
-                style: getInterStyle(fontSize: 12.sp, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-
-          // Rating (feedback only)
-          if (!isIncident && rating != null) ...[
-            SizedBox(height: 10.h),
-            Row(
-              children: List.generate(5, (i) {
-                final r = double.tryParse(rating!) ?? 0;
-                return Icon(
-                  i < r ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: Colors.amber,
-                  size: 20.sp,
-                );
-              }),
-            ),
-          ],
-
-          // Content
-          if (cleanContent.isNotEmpty) ...[
-            SizedBox(height: 10.h),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              },
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(10.w),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cleanContent,
-                      style: getInterStyle(
-                        fontSize: 13.sp,
-                        color: Colors.black87,
-                        height: 1.4,
-                      ),
-                      maxLines: _isExpanded ? null : 3,
-                      overflow: _isExpanded
-                          ? TextOverflow.visible
-                          : TextOverflow.ellipsis,
-                    ),
-                    if (cleanContent.length > 120)
-                      Padding(
-                        padding: EdgeInsets.only(top: 6.h),
-                        child: Text(
-                          _isExpanded ? 'Voir moins' : 'Voir plus',
-                          style: getInterStyle(
-                            fontSize: 11.sp,
-                            color: accentColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+          // ── Bande colorée en haut ──────────────────────────────────────
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
-          ],
-
-          SizedBox(height: 10.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (isHandled)
+            child: Row(
+              children: [
+                // Badge type
                 Container(
-                  padding:
-                      EdgeInsets.symmetric(vertical: 6.h, horizontal: 10.w),
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(12),
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    isIncident ? 'Incident traité' : 'Retour traité',
-                    style: getInterStyle(
-                      fontSize: 12.sp,
-                      color: Colors.green[900],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(),
-              Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentColor.withOpacity(0.25)),
-                    ),
-                    child: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'handle') {
-                          widget.onMarkHandled();
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'handle',
-                          child: Text(isIncident
-                              ? 'Marquer comme traité'
-                              : 'Marquer comme lu'),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isIncident ? Icons.warning_amber_rounded : Icons.star_rounded,
+                        color: Colors.white,
+                        size: 12.sp,
+                      ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        isIncident ? 'INCIDENT' : 'RETOUR',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
-                      ],
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 12.w, vertical: 8.h),
-                        child: widget.isLoading
-                            ? SizedBox(
-                                width: 14.w,
-                                height: 14.w,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: accentColor))
-                            : Row(
-                                children: [
-                                  Text(
-                                    isIncident ? 'Traiter' : 'Lu',
-                                    style: getInterStyle(
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.bold,
-                                        color: accentColor),
-                                  ),
-                                  Icon(Icons.arrow_drop_down,
-                                      color: accentColor, size: 18.sp),
-                                ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                if (createdAt != null)
+                  Text(
+                    DateFormat('dd/MM à HH:mm').format(createdAt),
+                    style: getInterStyle(fontSize: 11.sp, color: Colors.grey[500]),
+                  ),
+              ],
+            ),
+          ),
+
+          // ── Corps de la carte ──────────────────────────────────────────
+          Padding(
+            padding: EdgeInsets.all(14.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Établissement
+                Row(
+                  children: [
+                    Container(
+                      width: 32.w,
+                      height: 32.w,
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.business_outlined,
+                          color: accentColor, size: 16.sp),
+                    ),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Établissement',
+                            style: getInterStyle(
+                                fontSize: 10.sp, color: Colors.grey[400]),
+                          ),
+                          Text(
+                            missionName,
+                            style: getInterStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 10.h),
+                Divider(height: 1, color: Colors.grey[100]),
+                SizedBox(height: 10.h),
+
+                // Professionnel en charge
+                Row(
+                  children: [
+                    Container(
+                      width: 32.w,
+                      height: 32.w,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0059AB).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.person_outline,
+                          color: const Color(0xFF0059AB), size: 16.sp),
+                    ),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Professionnel en charge',
+                            style: getInterStyle(
+                                fontSize: 10.sp, color: Colors.grey[400]),
+                          ),
+                          Text(
+                            senderName,
+                            style: getInterStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0059AB),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Note étoiles (retours uniquement)
+                if (!isIncident && rating != null) ...[
+                  SizedBox(height: 10.h),
+                  Row(
+                    children: [
+                      Text('Note : ',
+                          style: getInterStyle(
+                              fontSize: 12.sp, color: Colors.grey[500])),
+                      ...List.generate(5, (i) {
+                        final r = double.tryParse(rating!) ?? 0;
+                        return Icon(
+                          i < r ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: Colors.amber,
+                          size: 18.sp,
+                        );
+                      }),
+                      SizedBox(width: 4.w),
+                      Text('$rating/5',
+                          style: getInterStyle(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber[800])),
+                    ],
+                  ),
+                ],
+
+                // Message
+                if (cleanContent.isNotEmpty) ...[
+                  SizedBox(height: 12.h),
+                  GestureDetector(
+                    onTap: () => setState(() => _isExpanded = !_isExpanded),
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cleanContent,
+                            style: getInterStyle(
+                              fontSize: 13.sp,
+                              color: Colors.black87,
+                              height: 1.5,
+                            ),
+                            maxLines: _isExpanded ? null : 3,
+                            overflow: _isExpanded
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                          ),
+                          if (cleanContent.length > 120)
+                            Padding(
+                              padding: EdgeInsets.only(top: 6.h),
+                              child: Text(
+                                _isExpanded ? '▲ Voir moins' : '▼ Voir plus',
+                                style: getInterStyle(
+                                  fontSize: 11.sp,
+                                  color: accentColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 ],
-              ),
-            ],
+
+                SizedBox(height: 12.h),
+
+                // Footer : statut + bouton
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (isHandled)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 10.w, vertical: 5.h),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.green[200]!),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline,
+                                color: Colors.green[700], size: 13.sp),
+                            SizedBox(width: 4.w),
+                            Text(
+                              isIncident ? 'Traité' : 'Lu',
+                              style: getInterStyle(
+                                fontSize: 11.sp,
+                                color: Colors.green[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const SizedBox(),
+                    // Bouton traiter
+                    Container(
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'handle' || value == 'unhandle') {
+                            widget.onMarkHandled();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (!isHandled)
+                            PopupMenuItem(
+                              value: 'handle',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.check_circle_outline,
+                                      color: Colors.green, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(isIncident
+                                      ? 'Marquer comme traité'
+                                      : 'Marquer comme lu'),
+                                ],
+                              ),
+                            )
+                          else
+                            PopupMenuItem(
+                              value: 'unhandle',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.undo, color: Colors.orange, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(isIncident
+                                      ? 'Annuler le traitement'
+                                      : 'Marquer comme non lu'),
+                                ],
+                              ),
+                            ),
+                        ],
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 14.w, vertical: 8.h),
+                          child: widget.isLoading
+                              ? SizedBox(
+                                  width: 14.w,
+                                  height: 14.w,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: accentColor))
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      isHandled
+                                          ? (isIncident ? 'Annuler' : 'Non lu')
+                                          : (isIncident ? 'Traiter' : 'Marquer lu'),
+                                      style: getInterStyle(
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: isHandled ? Colors.orange : accentColor,
+                                      ),
+                                    ),
+                                    Icon(Icons.arrow_drop_down,
+                                        color: isHandled ? Colors.orange : accentColor,
+                                        size: 18.sp),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -232,6 +232,19 @@ class MissionService {
     }
   }
 
+  /// Valider la fin de mission via QR Code (côté structure)
+  Future<void> completeMissionByQr(
+      int missionId, Map<String, dynamic> qrPayload) async {
+    try {
+      await _apiService.post(
+        '${ApiConfig.missions}/$missionId/complete-by-qr',
+        qrPayload,
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la validation QR : $e');
+    }
+  }
+
   // Annuler une mission acceptée (professionnel)
   Future<Map<String, dynamic>> cancelMission(int missionId, String motif) async {
     try {

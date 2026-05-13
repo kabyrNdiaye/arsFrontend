@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/mission_provider.dart';
 import '../../providers/notification_provider.dart';
+import 'mission_qr_screen.dart';
 
 class MissionDetailScreen extends StatefulWidget {
   final MissionModel mission;
@@ -980,21 +981,13 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       return;
     }
 
-    setState(() => _isFinishing = true);
-    try {
-      await _missionService.finishMission(widget.mission.id);
-      if (mounted) {
-        setState(() => _isFinishing = false);
-        _showFeedbackDialog();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isFinishing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
-        );
-      }
-    }
+    // Afficher le QR Code pour que la structure scanne
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MissionQrScreen(mission: widget.mission),
+      ),
+    );
   }
 
   void _showFeedbackDialog() {

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../utils/font_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
@@ -16,6 +17,7 @@ import 'parametres_screen.dart';
 import 'professionnel_edit_profil_screen.dart';
 import 'professionnel_change_password_screen.dart';
 import 'professionnel_edit_documents_screen.dart';
+import '../../services/stripe_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ProfilScreen extends StatefulWidget {
@@ -169,6 +171,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: Size(375, 812));
     final langProvider = Provider.of<LanguageProvider>(context);
+    final user = Provider.of<AuthProvider>(context).user;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -180,27 +183,42 @@ class _ProfilScreenState extends State<ProfilScreen> {
       ),
       child: Scaffold(
         backgroundColor: Color(0xFFF5F7FA),
-        body: Column(
+        body: Stack(
           children: [
-            _buildHeader(langProvider),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 20.h),
-                    _buildDocumentsSection(langProvider),
-                    SizedBox(height: 16.h),
-                    _buildParametresSection(langProvider),
-                    SizedBox(height: 16.h),
-                    _buildCompteSection(langProvider),
-                    SizedBox(height: 16.h),
-                    _buildDeconnexionButton(langProvider),
-                    SizedBox(height: 32.h),
-                  ],
+            Column(
+              children: [
+                _buildHeader(langProvider),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 20.h),
+                        _buildDocumentsSection(langProvider),
+                        SizedBox(height: 16.h),
+                        if (user?.role == 'professionnel') ...[
+                          _buildPaiementSection(langProvider),
+                          SizedBox(height: 16.h),
+                        ],
+                        _buildParametresSection(langProvider),
+                        SizedBox(height: 16.h),
+                        _buildCompteSection(langProvider),
+                        SizedBox(height: 16.h),
+                        _buildDeconnexionButton(langProvider),
+                        SizedBox(height: 32.h),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.3),
+                child: Center(
+                  child: CircularProgressIndicator(),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -436,6 +454,120 @@ class _ProfilScreenState extends State<ProfilScreen> {
     );
   }
 
+  Widget _buildPaiementSection(LanguageProvider langProvider) {
+    final user = Provider.of<AuthProvider>(context).user;
+    final isStripeComplete = user?.stripeOnboardingComplete ?? false;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.symmetric(vertical: 16.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Text(
+              'Paiements & RIB',
+              style: getInterStyle(
+                fontSize: 15.sp,
+                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Text(
+              isStripeComplete
+                  ? 'Votre compte de paiement est configuré et actif. Vous recevrez vos paiements automatiquement après chaque mission.'
+                  : 'Configurez votre compte bancaire pour recevoir vos paiements directement par virement après chaque mission.',
+              style: getInterStyle(
+                fontSize: 13.sp,
+                color: Colors.grey[600]!,
+                height: 1.4,
+              ),
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w),
+            child: GestureDetector(
+              onTap: () async {
+                setState(() => _isLoading = true);
+                final stripeService = StripeService();
+                final response = await stripeService.createConnectAccount();
+                setState(() => _isLoading = false);
+
+                if (response['success'] == true && response['url'] != null) {
+                  final url = Uri.parse(response['url']);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Impossible d\'ouvrir l\'URL de configuration.')),
+                      );
+                    }
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(response['message'] ?? 'Erreur lors de la configuration.')),
+                    );
+                  }
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: isStripeComplete ? Color(0xFFE8F5E9) : Color(0xFF0059AB),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isStripeComplete ? Icons.check_circle : Icons.account_balance,
+                      color: isStripeComplete ? Color(0xFF2E7D32) : Colors.white,
+                      size: 18.sp,
+                    ),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Text(
+                        isStripeComplete
+                            ? 'Accéder à mon tableau de bord Stripe'
+                            : 'Configurer mes paiements (Stripe)',
+                        style: getInterStyle(
+                          fontSize: 13.sp,
+                          color: isStripeComplete ? Color(0xFF2E7D32) : Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildParametresSection(LanguageProvider langProvider) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -504,24 +636,35 @@ class _ProfilScreenState extends State<ProfilScreen> {
           _buildCompteItem(
             icon: Icons.person_outline,
             title: langProvider.translate('modify_info') ?? 'Modifier mes informations',
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfessionnelEditProfilScreen()),
               );
+              // Recharger le profil après modification
+              if (mounted) {
+                await Provider.of<AuthProvider>(context, listen: false).loadProfile();
+                setState(() {});
+              }
             },
           ),
           Divider(height: 1, color: Colors.grey[100], indent: 56.w),
           _buildCompteItem(
             icon: Icons.description_outlined,
             title: 'Modifier mes documents',
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const ProfessionnelEditDocumentsScreen(),
                 ),
               );
+              // Recharger les documents et le profil après modification
+              if (mounted) {
+                await Provider.of<AuthProvider>(context, listen: false).loadProfile();
+                Provider.of<DocumentProvider>(context, listen: false).fetchDocuments();
+                setState(() {});
+              }
             },
           ),
           Divider(height: 1, color: Colors.grey[100], indent: 56.w),

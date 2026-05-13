@@ -1,7 +1,9 @@
 class ApiConfig {
   // URL de base de votre API backend
+  // LOCAL : http://127.0.0.1:8000/api
+  // PROD  : https://arsbackend.onrender.com/api
   static const String _baseUrl =
-      String.fromEnvironment('API_URL', defaultValue: 'https://arsbackend.onrender.com/api');
+      String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1:8000/api');
 
   static String get baseUrl => _baseUrl;
 
@@ -22,6 +24,8 @@ class ApiConfig {
   static const String structures = '/structures';
   static const String adminStats = '/stats/admin';
   static const String structureStats = '/stats/structure';
+  static const String stripeAccount = '/stripe/account';
+  static const String stripeStatus = '/stripe/status';
 
   // Timeout pour les requêtes (Augmenté pour Render.com Free Tier)
   static const Duration connectTimeout = Duration(seconds: 60);

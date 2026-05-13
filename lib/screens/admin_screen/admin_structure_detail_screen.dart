@@ -28,6 +28,34 @@ class _AdminStructureDetailScreenState
   final AuthService _authService = AuthService();
   bool _isValidating = false;
 
+  // Données fraîches rechargées depuis le backend
+  late User _structure;
+  bool _isLoadingFresh = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _structure = widget.structure; // Affichage immédiat avec les données passées
+    _loadFreshData();
+  }
+
+  /// Recharge les données fraîches depuis le backend
+  Future<void> _loadFreshData() async {
+    try {
+      final fresh = await _authService.getStructureById(widget.structure.id);
+      if (fresh != null && mounted) {
+        setState(() {
+          _structure = fresh;
+          _isLoadingFresh = false;
+        });
+      } else {
+        if (mounted) setState(() => _isLoadingFresh = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingFresh = false);
+    }
+  }
+
   Future<void> _validateUser(String statut) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -77,7 +105,7 @@ class _AdminStructureDetailScreenState
 
     try {
       final result = await _authService.validateUser(
-          widget.structure.id, statut);
+          _structure.id, statut);
 
       if (!mounted) return;
       setState(() => _isValidating = false);
@@ -115,7 +143,7 @@ class _AdminStructureDetailScreenState
   Widget build(BuildContext context) {
     ScreenUtil.init(context, designSize: const Size(375, 812));
 
-    final struct = widget.structure;
+    final struct = _structure;
     final isPending = struct.statutValidation == 'en_attente';
 
     return Scaffold(
@@ -124,6 +152,14 @@ class _AdminStructureDetailScreenState
         children: [
           // Header
           _buildHeader(struct),
+
+          // Indicateur de chargement discret
+          if (_isLoadingFresh)
+            LinearProgressIndicator(
+              color: _primaryPurple,
+              backgroundColor: _primaryPurple.withOpacity(0.1),
+              minHeight: 2,
+            ),
 
           // Contenu scrollable
           Expanded(
@@ -199,7 +235,7 @@ class _AdminStructureDetailScreenState
           children: [
             Padding(
               padding: EdgeInsets.only(
-                top: 16.h,
+                top: MediaQuery.of(context).padding.top + 40.h,
                 left: 12.w,
                 right: 12.w,
               ),
@@ -209,7 +245,7 @@ class _AdminStructureDetailScreenState
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
+              padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 20.h),
               child: Row(
                 children: [
                   GestureDetector(
@@ -540,6 +576,7 @@ class _AdminStructureDetailScreenState
                       builder: (context) => DocumentViewerScreen(
                         title: doc['label']!,
                         url: doc['url']!,
+                        primaryColor: _primaryPurple,
                       ),
                     ),
                   );

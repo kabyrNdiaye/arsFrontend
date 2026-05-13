@@ -21,6 +21,8 @@ class User {
 
   final int? structureId;
   final int? professionnelId;
+  final String? stripeAccountId;
+  final bool? stripeOnboardingComplete;
 
   final String? contratPrestationPath;
   final String? planLocauxPath;
@@ -65,6 +67,8 @@ class User {
     this.reglementInterieurPath,
     this.structureId,
     this.professionnelId,
+    this.stripeAccountId,
+    this.stripeOnboardingComplete,
     this.fonctionPrincipale,
     this.currentMission,
     this.statutValidation,
@@ -158,6 +162,8 @@ class User {
       reglementInterieurPath: sanitizeUrl(json['reglement_interieur_path']),
       structureId: json['structure_id'] != null ? int.tryParse(json['structure_id'].toString()) : null,
       professionnelId: json['professionnel_id'] != null ? int.tryParse(json['professionnel_id'].toString()) : null,
+      stripeAccountId: json['stripe_account_id'],
+      stripeOnboardingComplete: json['stripe_onboarding_complete'] == true || json['stripe_onboarding_complete'] == 1 || json['stripe_onboarding_complete'] == '1',
       fonctionPrincipale: json['fonction_principale'],
       currentMission: json['current_mission'],
       statutValidation: json['statut_validation'],
@@ -210,6 +216,8 @@ class User {
     String? ville,
     int? structureId,
     int? professionnelId,
+    String? stripeAccountId,
+    bool? stripeOnboardingComplete,
     String? contratPrestationPath,
     String? planLocauxPath,
     String? reglementInterieurPath,
@@ -250,6 +258,8 @@ class User {
       ville: ville ?? this.ville,
       structureId: structureId ?? this.structureId,
       professionnelId: professionnelId ?? this.professionnelId,
+      stripeAccountId: stripeAccountId ?? this.stripeAccountId,
+      stripeOnboardingComplete: stripeOnboardingComplete ?? this.stripeOnboardingComplete,
       contratPrestationPath: contratPrestationPath ?? this.contratPrestationPath,
       planLocauxPath: planLocauxPath ?? this.planLocauxPath,
       reglementInterieurPath: reglementInterieurPath ?? this.reglementInterieurPath,

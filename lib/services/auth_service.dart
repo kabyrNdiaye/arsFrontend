@@ -235,75 +235,105 @@ class AuthService {
   // Mettre à jour le profil utilisateur
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     try {
-      final photoPath = data.remove('photo_profil_path');
-      
-      if (photoPath != null) {
-        // Mode Multipart pour l'upload d'image
-        var request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}${ApiConfig.updateProfileEndpoint}'));
-        request.headers.addAll(ApiConfig.getHeaders(token: _apiService.token));
-        request.headers.remove('Content-Type');
-        
-        // Spoofing de la méthode PUT pour Laravel
-        request.fields['_method'] = 'PUT';
-        
-        // Champs texte
-        data.forEach((key, value) {
-          request.fields[key] = value.toString();
-        });
-        
-        // Ajouter le fichier
-        if (photoPath is String) {
-          if (kIsWeb) {
-            // Sur le Web, on ne peut pas utiliser fromPath. 
-            // On s'attend à ce que l'appelant ait géré ça ou on utilise une autre approche.
-            // Pour l'instant, on lance une erreur plus descriptive ou on essaie de lire si c'est possible.
-            throw UnsupportedError("Sur Web, veuillez passer les bytes ou l'objet XFile au lieu du chemin String.");
-          } else {
-            request.files.add(await http.MultipartFile.fromPath('photo_profil_path', photoPath));
+      // Clés de fichiers gérées en multipart
+      const fileKeys = [
+        'photo_profil_path',
+        'contrat_prestation_path',
+        'plan_locaux_path',
+        'reglement_interieur_path',
+      ];
+
+      // Extraire les fichiers du map
+      final Map<String, dynamic> files = {};
+      for (final key in fileKeys) {
+        if (data.containsKey(key)) {
+          files[key] = data.remove(key);
+        }
+      }
+
+      // Toujours utiliser multipart (Laravel gère mieux _method=PUT)
+      var request = http.MultipartRequest(
+          'POST', Uri.parse('${ApiConfig.baseUrl}${ApiConfig.updateProfileEndpoint}'));
+      request.headers.addAll(ApiConfig.getHeaders(token: _apiService.token));
+      request.headers.remove('Content-Type');
+
+      // Spoofing de la méthode PUT pour Laravel
+      request.fields['_method'] = 'PUT';
+
+      // Champs texte — mapping exact vers les noms attendus par le backend
+      data.forEach((key, value) {
+        if (value != null && value.toString().isNotEmpty) {
+          // Mapper les clés Flutter → clés backend Laravel
+          final backendKey = _mapFieldKey(key);
+          request.fields[backendKey] = value.toString();
+        }
+      });
+
+      // Ajouter chaque fichier
+      for (final entry in files.entries) {
+        final key = entry.key;
+        final fileData = entry.value;
+        if (fileData == null) continue;
+
+        if (fileData is String) {
+          if (!kIsWeb) {
+            request.files.add(await http.MultipartFile.fromPath(key, fileData));
           }
-        } else if (photoPath is Map<String, dynamic> && photoPath.containsKey('bytes')) {
-          // Gestion via bytes (recommandé pour le Web)
+        } else if (fileData is Map<String, dynamic> &&
+            fileData.containsKey('bytes')) {
           request.files.add(http.MultipartFile.fromBytes(
-            'photo_profil_path',
-            photoPath['bytes'],
-            filename: photoPath['name'] ?? 'profile_photo.jpg',
+            key,
+            fileData['bytes'],
+            filename: fileData['name'] ?? 'upload.bin',
           ));
         }
+      }
 
-        final streamedResponse = await request.send();
-        final response = await http.Response.fromStream(streamedResponse);
-        final responseBody = jsonDecode(response.body);
+      // DEBUG
+      User.debugLog('=== UPDATE PROFILE ===');
+      User.debugLog('URL: ${ApiConfig.baseUrl}${ApiConfig.updateProfileEndpoint}');
+      User.debugLog('Fields: ${request.fields}');
+      User.debugLog('Files: ${request.files.map((f) => f.field).toList()}');
 
-        print('--- DEBUG PHOTO UPLOAD ---');
-        print('Status: ${response.statusCode}');
-        print('Response: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-        print('-------------------------');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          return {
-            'success': true,
-            'user': User.fromJson(responseBody['user'] ?? responseBody),
-          };
-        } else {
-          return {
-            'success': false,
-            'message': responseBody['message'] ?? 'Erreur lors de la mise à jour',
-          };
-        }
-      } else {
-        // Mode JSON classique
-        final response = await _apiService.put(ApiConfig.updateProfileEndpoint, data);
+      User.debugLog('Status: ${response.statusCode}');
+      User.debugLog('Response: ${response.body.length > 800 ? response.body.substring(0, 800) : response.body}');
+      User.debugLog('======================');
+
+      final responseBody = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
           'success': true,
-          'user': User.fromJson(response['user'] ?? response),
+          'user': User.fromJson(responseBody['user'] ?? responseBody),
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseBody['message'] ?? 'Erreur ${response.statusCode}',
+          'errors': responseBody['errors'],
         };
       }
     } catch (e) {
+      User.debugLog('=== UPDATE PROFILE ERROR: $e ===');
       return {
         'success': false,
         'message': e.toString(),
       };
     }
+  }
+
+  /// Mappe les clés Flutter vers les noms de champs attendus par le backend
+  String _mapFieldKey(String key) {
+    const map = {
+      'firstName': 'prenom',
+      'lastName': 'nom',
+      'phone': 'telephone',
+      // Les autres clés sont déjà au bon format snake_case
+    };
+    return map[key] ?? key;
   }
 
   // Récupérer la liste des professionnels
@@ -333,6 +363,27 @@ class AuthService {
     } catch (e) {
       print('Erreur lors de la récupération des structures: $e');
       return [];
+    }
+  }
+
+  // Récupérer une structure par son ID (données fraîches)
+  Future<User?> getStructureById(String userId) async {
+    try {
+      final response = await _apiService.get('${ApiConfig.structures}/$userId');
+      if (response['data'] != null) {
+        return User.fromJson(response['data']);
+      }
+      if (response['user'] != null) {
+        return User.fromJson(response['user']);
+      }
+      // Fallback : la réponse est directement l'objet user
+      if (response['id'] != null) {
+        return User.fromJson(response);
+      }
+      return null;
+    } catch (e) {
+      print('Erreur lors de la récupération de la structure $userId: $e');
+      return null;
     }
   }
 

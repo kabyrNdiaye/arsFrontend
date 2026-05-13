@@ -120,34 +120,86 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final Color headerColor = widget.primaryColor ?? _primaryBlue;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: getSourceSerifProStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+      body: Column(
+        children: [
+          // Header custom avec trait horizontal
+          Container(
+            color: headerColor,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  // Trait horizontal
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 40.h,
+                      left: 12.w,
+                      right: 12.w,
+                    ),
+                    child: Container(
+                      height: 1,
+                      color: Colors.white.withOpacity(0.15),
+                    ),
+                  ),
+                  // Titre + boutons
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 20.h),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: EdgeInsets.all(8.w),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.arrow_back_ios_new,
+                                color: Colors.white, size: 18.sp),
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            style: getSourceSerifProStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            await launchUrl(Uri.parse(widget.url),
+                                mode: LaunchMode.externalApplication);
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(8.w),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.open_in_new,
+                                color: Colors.white, size: 18.sp),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        backgroundColor: widget.primaryColor ?? _primaryBlue,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.open_in_new, color: Colors.white),
-            tooltip: 'Ouvrir dans un nouvel onglet',
-            onPressed: () async {
-              await launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication);
-            },
-          ),
+          // Contenu
+          Expanded(child: _buildBody()),
         ],
       ),
-      body: _buildBody(),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -51,8 +52,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
   bool _isStatsLoading = true;
   Map<String, dynamic>? _lastIncident;
   Map<String, dynamic>? _lastFeedback;
+  Map<String, dynamic>? _lastCancellation;
   bool _alertsLoading = false;
   AppLifecycleState? _lastLifecycleState;
+
+  // Timers pour le rafraîchissement automatique
+  Timer? _statsPollingTimer;
+  Timer? _midnightTimer;
 
   @override
   void initState() {
@@ -63,10 +69,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<MissionProvider>(context, listen: false).startPolling();
     });
+    // Polling stats toutes les 30 secondes
+    _statsPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _loadStats();
+    });
+    // Timer minuit — recharge les stats quand le jour change
+    _scheduleMidnightRefresh();
+  }
+
+  /// Planifie un rechargement automatique à minuit (remise à 0 des missions du jour)
+  void _scheduleMidnightRefresh() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    final durationUntilMidnight = midnight.difference(now);
+    _midnightTimer = Timer(durationUntilMidnight, () {
+      if (mounted) {
+        _loadStats();
+        // Replanifier pour le lendemain
+        _scheduleMidnightRefresh();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _statsPollingTimer?.cancel();
+    _midnightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     Provider.of<MissionProvider>(context, listen: false).stopPolling();
     super.dispose();
@@ -86,24 +114,69 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
     // Charger missions, stats et alertes en parallèle pour aller plus vite
     await Future.wait([
       Provider.of<MissionProvider>(context, listen: false).fetchMissions(),
-      _loadStats(),
       _loadLatestAlerts(),
     ]);
+    // Charger les stats après les missions (pour le fallback local)
+    await _loadStats();
   }
 
   Future<void> _loadStats() async {
     setState(() => _isStatsLoading = true);
     try {
       final stats = await _missionService.getAdminStats();
-      if (mounted) {
+      if (mounted && stats.isNotEmpty) {
         setState(() {
           _stats = stats;
           _isStatsLoading = false;
         });
+        return;
       }
     } catch (e) {
-      print('Erreur stats: $e');
-      setState(() => _isStatsLoading = false);
+      debugPrint('AdminHomeScreen: stats API indisponible, calcul local -> $e');
+    }
+
+    // Calcul local depuis les données déjà en mémoire (MissionProvider)
+    if (mounted) _computeStatsFromProvider();
+  }
+
+  void _computeStatsFromProvider() {
+    final missionProvider = Provider.of<MissionProvider>(context, listen: false);
+    final missions = missionProvider.missions;
+    final today = DateTime.now();
+
+    // 1. Missions du jour
+    final missionsToday = missions.where((m) {
+      if (m.horaireMission == null) return false;
+      final d = m.horaireMission!;
+      return d.year == today.year &&
+             d.month == today.month &&
+             d.day == today.day;
+    }).length;
+
+    // 2. Professionnels disponibles = pros avec au moins une mission validée
+    //    (ceux qui apparaissent dans les missions chargées)
+    final proIds = missions
+        .where((m) => m.professionnelId != null)
+        .map((m) => m.professionnelId!)
+        .toSet();
+    final availablePros = proIds.length;
+
+    // 3. Sites actifs = structures distinctes qui ont des missions
+    final siteNames = missions
+        .where((m) => m.structureName != null && m.structureName!.isNotEmpty)
+        .map((m) => m.structureName!)
+        .toSet();
+    final activeSites = siteNames.length;
+
+    if (mounted) {
+      setState(() {
+        _stats = {
+          'missions_today': missionsToday,
+          'available_professionals': availablePros,
+          'active_sites': activeSites,
+        };
+        _isStatsLoading = false;
+      });
     }
   }
 
@@ -136,8 +209,56 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
 
           if (mounted) {
             setState(() {
-              _lastIncident = incidents.isNotEmpty ? incidents.first : null;
-              _lastFeedback = retours.isNotEmpty ? retours.first : null;
+              // Normaliser l'incident : le backend retourne 'description', pas 'content'
+              _lastIncident = incidents.isNotEmpty
+                  ? {
+                      ...incidents.first,
+                      'content': incidents.first['description']?.toString() ?? '',
+                      '_mission_name': incidents.first['mission']?['structure']?['nom_etablissement']
+                          ?? incidents.first['mission']?['structure']?['user']?['name']
+                          ?? incidents.first['mission']?['establishment']
+                          ?? '',
+                      'sender_name': () {
+                        final u = incidents.first['mission']?['professionnel']?['user'];
+                        if (u?['prenom'] != null) return '${u['prenom']} ${u['nom'] ?? ''}'.trim();
+                        return u?['name'] ?? '';
+                      }(),
+                    }
+                  : null;
+
+              // Normaliser le retour : le backend retourne 'note' et 'commentaire', pas 'content'
+              _lastFeedback = retours.isNotEmpty
+                  ? {
+                      ...retours.first,
+                      'content': retours.first['commentaire']?.toString() ?? '',
+                      '_mission_name': retours.first['mission']?['structure']?['nom_etablissement']
+                          ?? retours.first['mission']?['structure']?['user']?['name']
+                          ?? '',
+                      'sender_name': () {
+                        final u = retours.first['mission']?['professionnel']?['user'];
+                        if (u?['prenom'] != null) return '${u['prenom']} ${u['nom'] ?? ''}'.trim();
+                        return u?['name'] ?? '';
+                      }(),
+                    }
+                  : null;
+              // Dernière annulation depuis les missions
+              final missionProvider = Provider.of<MissionProvider>(context, listen: false);
+              final cancelled = missionProvider.missions
+                  .where((m) =>
+                      m.userStatus == 'refusé' ||
+                      m.status?.toLowerCase() == 'annulé' ||
+                      m.status?.toLowerCase() == 'annulée')
+                  .toList()
+                ..sort((a, b) => (b.horaireMission ?? DateTime(2000))
+                    .compareTo(a.horaireMission ?? DateTime(2000)));
+              _lastCancellation = cancelled.isNotEmpty
+                  ? {
+                      '_mission_name': cancelled.first.structureName ?? 'Mission',
+                      'sender_name': cancelled.first.professionnelNom ?? 'Professionnel',
+                      'content': cancelled.first.commentaires ?? cancelled.first.adminComments ?? '',
+                      'created_at': cancelled.first.horaireMission?.toIso8601String(),
+                    }
+                  : null;
               _alertsLoading = false;
             });
           }
@@ -1137,14 +1258,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
           SizedBox(height: 12.h),
           // Skeleton card feedback
           _buildSkeletonCard(),
+          SizedBox(height: 12.h),
+          // Skeleton card annulation
+          _buildSkeletonCard(),
         ],
       );
     }
 
     final incidentText = _getAlertPreview(_lastIncident, true);
     final feedbackText = _getAlertPreview(_lastFeedback, false);
+    final cancellationText = _lastCancellation != null
+        ? (_lastCancellation!['_mission_name']?.toString() ?? 'Mission annulée')
+        : 'Aucune annulation récente';
     final incidentMeta = _getAlertMeta(_lastIncident);
     final feedbackMeta = _getAlertMeta(_lastFeedback);
+    final cancellationMeta = _lastCancellation != null
+        ? '${_lastCancellation!['sender_name'] ?? ''} • ${_getAlertMeta(_lastCancellation)}'
+        : '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1231,6 +1361,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
             showArrow: true,
           ),
         ),
+        SizedBox(height: 12.h),
+        // Carte Annulations — toujours visible
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminIncidentsScreen(initialTabIndex: 2),
+              ),
+            );
+          },
+          child: _buildAlertCard(
+            Icons.cancel_outlined,
+            const Color(0xFFFFF3E0),
+            Colors.orange,
+            _lastCancellation != null
+                ? cancellationText
+                : 'Aucune annulation récente',
+            _lastCancellation != null && cancellationMeta.isNotEmpty
+                ? cancellationMeta
+                : 'Voir toutes les annulations',
+            showArrow: true,
+          ),
+        ),
       ],
     );
   }
@@ -1241,13 +1395,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
     }
 
     final content = msg['content']?.toString() ?? '';
-    final cleanContent = content
-        .replaceAll(RegExp(r'^🚨 INCIDENT: \[[^\]]+\]\s*'), '')
-        .replaceAll(RegExp(r'^⭐ FEEDBACK: \[Note: \d+\.?\d*/5\]\s*'), '')
+
+    // Nettoyer tous les préfixes possibles
+    String cleanContent = content
+        .replaceAll(RegExp(r'^🚨 INCIDENT:\s*\[[^\]]+\]\s*'), '')
+        .replaceAll(RegExp(r'^⭐ FEEDBACK:\s*\[Note:\s*\d+\.?\d*/5\]\s*'), '')
+        .replaceAll(RegExp(r'^\[Note:\s*\d+\.?\d*/5\]\s*'), '')
+        .replaceAll(RegExp(r'^\[Note:\s*\d+\]\s*'), '')
         .trim();
 
     if (cleanContent.isEmpty) {
-      return isIncident ? 'Incident sans description' : 'Retour sans description';
+      // Essayer de récupérer depuis d'autres champs
+      final description = msg['description']?.toString() ?? '';
+      final commentaire = msg['commentaire']?.toString() ?? '';
+      cleanContent = description.isNotEmpty ? description : commentaire;
+    }
+
+    if (cleanContent.isEmpty) {
+      return isIncident ? 'Aucun incident récent' : 'Aucun retour récent';
     }
 
     return cleanContent.length > 80
@@ -1258,6 +1423,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
   String _getAlertMeta(Map<String, dynamic>? msg) {
     if (msg == null) return '';
     final missionName = msg['_mission_name']?.toString() ?? '';
+    final senderName = msg['sender_name']?.toString() ?? '';
     final createdAt = msg['created_at'] != null
         ? DateTime.tryParse(msg['created_at'].toString())
         : null;
@@ -1265,8 +1431,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
         ? DateFormat('dd/MM HH:mm').format(createdAt)
         : '';
 
-    return [if (missionName.isNotEmpty) missionName, if (date.isNotEmpty) date]
-        .join(' • ');
+    final parts = [
+      if (missionName.isNotEmpty) missionName,
+      if (senderName.isNotEmpty) senderName,
+      if (date.isNotEmpty) date,
+    ];
+    return parts.join(' • ');
   }
 
   Widget _buildSkeletonCard() {

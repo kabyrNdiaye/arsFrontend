@@ -1410,6 +1410,7 @@ class _AdminCreateMissionScreenState extends State<AdminCreateMissionScreen> {
         createData['date_fin'] = dateFinStr;
       }
 
+      if (_selectedEndTime != null) {
         createData['heure_fin'] = "${_selectedEndTime!.hour.toString().padLeft(2, '0')}:${_selectedEndTime!.minute.toString().padLeft(2, '0')}";
       }
 

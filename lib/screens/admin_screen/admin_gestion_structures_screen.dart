@@ -431,7 +431,8 @@ class _AdminGestionStructuresScreenState
 
     return InkWell(
       onTap: () async {
-        final refreshed = await Navigator.push<bool>(
+        // Toujours recharger après retour du détail (validation OU modification des infos)
+        await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) => AdminStructureDetailScreen(
@@ -439,9 +440,8 @@ class _AdminGestionStructuresScreenState
             ),
           ),
         );
-        if (refreshed == true) {
-          _loadStructures();
-        }
+        // Recharger dans tous les cas pour avoir les données fraîches
+        _loadStructures();
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
