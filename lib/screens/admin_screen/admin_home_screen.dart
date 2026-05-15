@@ -241,26 +241,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> with WidgetsBindingOb
                       }(),
                     }
                   : null;
-              // Dernière annulation depuis les missions
-              final missionProvider = Provider.of<MissionProvider>(context, listen: false);
-              final cancelled = missionProvider.missions
-                  .where((m) =>
-                      m.userStatus == 'refusé' ||
-                      m.status?.toLowerCase() == 'annulé' ||
-                      m.status?.toLowerCase() == 'annulée')
-                  .toList()
-                ..sort((a, b) => (b.horaireMission ?? DateTime(2000))
-                    .compareTo(a.horaireMission ?? DateTime(2000)));
-              _lastCancellation = cancelled.isNotEmpty
-                  ? {
-                      '_mission_name': cancelled.first.structureName ?? 'Mission',
-                      'sender_name': cancelled.first.professionnelNom ?? 'Professionnel',
-                      'content': cancelled.first.commentaires ?? cancelled.first.adminComments ?? '',
-                      'created_at': cancelled.first.horaireMission?.toIso8601String(),
-                    }
-                  : null;
               _alertsLoading = false;
             });
+
+            // Dernière annulation depuis l'API (hors setState car async)
+            try {
+              final cancellations = await _missionService.getCancellations();
+              if (mounted) {
+                setState(() {
+                  _lastCancellation = cancellations.isNotEmpty ? cancellations.first : null;
+                });
+              }
+            } catch (_) {
+              if (mounted) setState(() => _lastCancellation = null);
+            }
           }
           return;
         }

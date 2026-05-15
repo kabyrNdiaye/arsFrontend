@@ -26,6 +26,8 @@ class ApiConfig {
   static const String structureStats = '/stats/structure';
   static const String stripeAccount = '/stripe/account';
   static const String stripeStatus = '/stripe/status';
+  static const String stripeDashboard = '/stripe/dashboard';
+  static const String missionPay = '/missions';
 
   // Timeout pour les requêtes (Augmenté pour Render.com Free Tier)
   static const Duration connectTimeout = Duration(seconds: 60);

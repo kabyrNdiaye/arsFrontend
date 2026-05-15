@@ -73,7 +73,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
                 children: [
                   _buildHeader(langProvider),
                   Padding(
-                    padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 0),
+                    padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -510,8 +510,8 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(24.w),
-      margin: EdgeInsets.only(bottom: 24.h),
+      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 12.h),
+      margin: EdgeInsets.only(bottom: 4.h),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -526,7 +526,6 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 8.h),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -581,7 +580,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
               fontWeight: FontWeight.w400,
             ),
           ),
-          SizedBox(height: 20.h),
+          SizedBox(height: 10.h),
           Row(
             children: [
               Icon(Icons.access_time_outlined, color: Colors.grey[400], size: 18.sp),
@@ -596,9 +595,9 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
               ),
             ],
           ),
-          SizedBox(height: 20.h),
+          SizedBox(height: 10.h),
           _buildCompactMenuBlock(mission),
-          SizedBox(height: 20.h),
+          SizedBox(height: 10.h),
           Center(
             child: SizedBox(
               width: 319.w,
@@ -637,6 +636,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
                       ),
                     ),
                   ),
+                  if (!['terminé', 'terminée', 'finished', 'termine'].contains(mission.status.toLowerCase().trim())) ...[
                   SizedBox(width: 12.w),
                   Expanded(
                     child: Stack(
@@ -698,6 +698,7 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
                       ],
                     ),
                   ),
+                  ],
                 ],
               ),
             ),
@@ -768,6 +769,21 @@ class _ClientMissionsScreenState extends State<ClientMissionsScreen> {
 
   Widget _buildMenuRowsForMeal(RepasModel repas) {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
+    final bool isSimple = repas.typeRepas == 'breakfast' || repas.typeRepas == 'snack'
+        || repas.typeRepas == 'petit-déjeuner' || repas.typeRepas == 'goûter'
+        || repas.typeRepas == 'gouter' || repas.typeRepas == 'brunch';
+
+    if (isSimple) {
+      final simple = repas.getDisplayName('simple');
+      if (simple.isEmpty) {
+        return Text(
+          lang.translate('menu_not_communicated') ?? 'Menu non communiqué',
+          style: TextStyle(fontSize: 13.sp, color: Colors.grey[400], fontStyle: FontStyle.italic),
+        );
+      }
+      return Text(simple, style: TextStyle(fontSize: 14.sp, color: Colors.black87, fontWeight: FontWeight.w500));
+    }
+
     return Column(
       children: [
         _buildSimplifiedMenuRow(lang.translate('starter_label'), repas.getDisplayName('entree'), lang),

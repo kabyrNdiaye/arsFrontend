@@ -245,6 +245,41 @@ class MissionService {
     }
   }
 
+  // Créer une session de paiement Stripe Checkout (Structure)
+  Future<Map<String, dynamic>> createCheckout(int missionId) async {
+    try {
+      return await _apiService.post(
+        '${ApiConfig.missions}/$missionId/checkout',
+        {},
+      );
+    } catch (e) {
+      throw Exception('Erreur lors de la création du paiement: $e');
+    }
+  }
+
+  // Récupérer l'historique des annulations (Admin)
+  Future<List<Map<String, dynamic>>> getCancellations() async {
+    try {
+      final response = await _apiService.get('${ApiConfig.missions}/cancellations');
+      final List<dynamic> data = response['data'] ?? [];
+      return data.cast<Map<String, dynamic>>();
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des annulations: $e');
+    }
+  }
+
+  // Déclencher le paiement Stripe vers le professionnel (Admin)
+  Future<Map<String, dynamic>> payMission(int missionId) async {
+    try {
+      return await _apiService.post(
+        '${ApiConfig.missionPay}/$missionId/pay',
+        {},
+      );
+    } catch (e) {
+      throw Exception('Erreur lors du déclenchement du paiement: $e');
+    }
+  }
+
   // Annuler une mission acceptée (professionnel)
   Future<Map<String, dynamic>> cancelMission(int missionId, String motif) async {
     try {

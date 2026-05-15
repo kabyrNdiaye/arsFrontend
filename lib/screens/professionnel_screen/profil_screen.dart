@@ -36,15 +36,40 @@ class ProfilScreen extends StatefulWidget {
   _ProfilScreenState createState() => _ProfilScreenState();
 }
 
-class _ProfilScreenState extends State<ProfilScreen> {
+class _ProfilScreenState extends State<ProfilScreen> with WidgetsBindingObserver {
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<DocumentProvider>(context, listen: false).fetchDocuments();
+      _refreshStripeStatus();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshStripeStatus();
+    }
+  }
+
+  Future<void> _refreshStripeStatus() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.user?.role != 'professionnel') return;
+    try {
+      await StripeService().checkOnboardingStatus();
+      await authProvider.loadProfile();
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   List<Map<String, String?>> _getDocuments(LanguageProvider langProvider) {
@@ -477,13 +502,22 @@ class _ProfilScreenState extends State<ProfilScreen> {
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w),
-            child: Text(
-              'Paiements & RIB',
-              style: getInterStyle(
-                fontSize: 15.sp,
-                color: Colors.black87,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Paiements & RIB',
+                  style: getInterStyle(
+                    fontSize: 15.sp,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _refreshStripeStatus,
+                  child: Icon(Icons.refresh, color: Color(0xFF0059AB), size: 20.sp),
+                ),
+              ],
             ),
           ),
           SizedBox(height: 12.h),
@@ -507,7 +541,9 @@ class _ProfilScreenState extends State<ProfilScreen> {
               onTap: () async {
                 setState(() => _isLoading = true);
                 final stripeService = StripeService();
-                final response = await stripeService.createConnectAccount();
+                final response = isStripeComplete
+                    ? await stripeService.getDashboardLink()
+                    : await stripeService.createConnectAccount();
                 setState(() => _isLoading = false);
 
                 if (response['success'] == true && response['url'] != null) {

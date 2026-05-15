@@ -19,6 +19,21 @@ class StripeService {
     }
   }
 
+  Future<Map<String, dynamic>> getDashboardLink() async {
+    try {
+      final response = await _apiService.get(ApiConfig.stripeDashboard);
+      return {
+        'success': true,
+        'url': response['url'],
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
   Future<Map<String, dynamic>> checkOnboardingStatus() async {
     try {
       final response = await _apiService.get(ApiConfig.stripeStatus);

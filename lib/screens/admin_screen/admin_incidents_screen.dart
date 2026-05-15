@@ -123,6 +123,14 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
     if (!mounted) return;
     setState(() => _isLoading = true);
 
+    // Charger les annulations immédiatement (sans attendre le reste)
+    try {
+      final cancellations = await _missionService.getCancellations();
+      if (mounted) setState(() => _allCancellations = cancellations);
+    } catch (e) {
+      debugPrint('AdminIncidentsScreen: Cancellations error: $e');
+    }
+
     final missionProvider =
         Provider.of<MissionProvider>(context, listen: false);
 
@@ -283,29 +291,6 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
       setState(() {
         _allIncidents = incidents;
         _allFeedbacks = feedbacks;
-        // Extraire les annulations depuis les missions refusées/annulées
-        _allCancellations = missionProvider.missions
-            .where((m) =>
-                m.userStatus == 'refusé' ||
-                m.status?.toLowerCase() == 'annulé' ||
-                m.status?.toLowerCase() == 'annulée' ||
-                m.status?.toLowerCase() == 'cancelled')
-            .map((m) => {
-                  'id': m.id,
-                  '_mission_name': m.structureName ?? 'Mission',
-                  'sender_name': m.professionnelNom ?? 'Professionnel',
-                  'content': m.commentaires ?? m.adminComments ?? 'Aucun motif renseigné',
-                  'created_at': m.horaireMission?.toIso8601String(),
-                  'status': m.status ?? 'Annulé',
-                  'user_status': m.userStatus ?? '',
-                  '_mission_id': m.id,
-                })
-            .toList()
-          ..sort((a, b) {
-            final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
-            final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
-            return bDate.compareTo(aDate);
-          });
         _isLoading = false;
       });
     }
@@ -795,8 +780,9 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
           final String missionName = item['_mission_name'] ?? 'Mission';
           final String senderName = item['sender_name'] ?? 'Professionnel';
           final String motif = item['content'] ?? 'Aucun motif renseigné';
+          final bool isLate = item['is_late'] == true || item['is_late'] == 1;
           final DateTime? date = item['created_at'] != null
-              ? DateTime.tryParse(item['created_at'])
+              ? DateTime.tryParse(item['created_at'].toString())
               : null;
           final String dateStr = date != null
               ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
@@ -822,24 +808,37 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[700],
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.cancel_outlined, color: Colors.white, size: 12.sp),
-                          SizedBox(width: 4.w),
-                          Text('ANNULATION',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.sp,
-                                  fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[700],
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cancel_outlined, color: Colors.white, size: 12.sp),
+                              SizedBox(width: 4.w),
+                              Text('ANNULATION',
+                                  style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        if (isLate) ...[
+                          SizedBox(width: 6.w),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            decoration: BoxDecoration(
+                              color: Colors.red[700],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text('TARDIVE',
+                                style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold)),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                     const Spacer(),
                     Text(dateStr,
@@ -848,27 +847,33 @@ class _AdminIncidentsScreenState extends State<AdminIncidentsScreen>
                   ],
                 ),
                 SizedBox(height: 10.h),
+                // Structure
                 Row(
                   children: [
-                    Icon(Icons.business, size: 14.sp, color: Colors.grey[600]),
+                    Icon(Icons.business_outlined, size: 14.sp, color: Colors.orange[700]),
                     SizedBox(width: 6.w),
+                    Text('Structure : ',
+                        style: getInterStyle(fontSize: 12.sp, color: Colors.grey[500], fontWeight: FontWeight.w600)),
                     Expanded(
                       child: Text(missionName,
-                          style: getInterStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87)),
+                          style: getInterStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                          overflow: TextOverflow.ellipsis),
                     ),
                   ],
                 ),
-                SizedBox(height: 4.h),
+                SizedBox(height: 6.h),
+                // Professionnel
                 Row(
                   children: [
-                    Icon(Icons.person_outline, size: 14.sp, color: Colors.grey[600]),
+                    Icon(Icons.person_outline, size: 14.sp, color: Colors.orange[700]),
                     SizedBox(width: 6.w),
-                    Text(senderName,
-                        style: getInterStyle(
-                            fontSize: 12.sp, color: Colors.grey[600])),
+                    Text('Professionnel : ',
+                        style: getInterStyle(fontSize: 12.sp, color: Colors.grey[500], fontWeight: FontWeight.w600)),
+                    Expanded(
+                      child: Text(senderName,
+                          style: getInterStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.black87),
+                          overflow: TextOverflow.ellipsis),
+                    ),
                   ],
                 ),
                 SizedBox(height: 10.h),
